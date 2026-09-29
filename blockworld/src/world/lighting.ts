@@ -178,12 +178,15 @@ export class LightEngine {
       const raw = c.light[idx];
       const level = channel === 0 ? raw >> 4 : raw & 15;
       if (level <= 1) continue;
+      const lx = x & 15; const lz = z & 15;
       for (let f = 0; f < 6; f++) {
         const ny = y + DY[f];
         if (ny < 0 || ny >= WORLD_HEIGHT) continue;
         const nx = x + DX[f];
         const nz = z + DZ[f];
-        const nc = this.chunkAt(nx, nz);
+        // Most neighbours are in the same chunk: skip the lookup for them.
+        const same = (f === 0 && lx < 15) || (f === 1 && lx > 0) || f === 2 || f === 3 || (f === 4 && lz < 15) || (f === 5 && lz > 0);
+        const nc = same ? c : this.chunkAt(nx, nz);
         if (!nc || !nc.lit) continue;
         const ni = blockIndex(nx & 15, ny, nz & 15);
         const op = OPAQUE_LIGHT[nc.blocks[ni]];

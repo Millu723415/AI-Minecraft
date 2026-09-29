@@ -3,6 +3,7 @@
  * materials share silhouettes; everything else is hand-authored ASCII art.
  */
 
+import { packItemTile } from './pack';
 import { DYE_COLOR_RGB } from '../blocks/ids';
 import { PixelTile, mix, shade, type RGB } from './pixel';
 
@@ -545,6 +546,7 @@ export function paintItemSprite(name: string): PixelTile | null {
   if (!fn) return null;
   const t = new PixelTile(`item:${name}`);
   t.clear();
+  if (packItemTile(name, t)) return t;
   fn(t);
   return t;
 }

@@ -3,6 +3,7 @@
 import { clickSlot, takeFromOutput, slotAccepts, type ClickButton, type SlotRules } from '../items/slotlogic';
 import { canMerge, cloneStack, isEmpty, maxStackSize, type ItemStack } from '../items/stack';
 import { el } from './dom';
+import { packActive, packCanvas, packImage } from '../render/pack';
 import { ItemView, renderTooltip } from './itemview';
 import type { UIManager } from './manager';
 
@@ -42,6 +43,8 @@ export interface SlotDef {
   big?: boolean;
   /** Faint background icon when empty (armor slots). */
   ghost?: HTMLCanvasElement;
+  /** Custom click behaviour (creative palette); return true when handled. */
+  click?: (button: ClickButton, shift: boolean) => boolean;
 }
 
 export abstract class ContainerScreen extends Screen {
@@ -60,6 +63,45 @@ export abstract class ContainerScreen extends Screen {
   /** Subclasses add slots and decorations here. */
   protected abstract build(): void;
 
+  /**
+   * Resource-pack GUI texture for this screen: file, rectangles of the
+   * texture to stack vertically ([sx, sy, w, h]) and areas to blank out
+   * (slots of features that do not exist in this game).
+   */
+  protected packBackground(): { path: string; parts?: [number, number, number, number][]; cover?: [number, number, number, number][] } | null {
+    return null;
+  }
+
+  /** True when the screen is drawn on a resource-pack GUI texture. */
+  protected get textured(): boolean {
+    return packActive() && !!this.packBackground() && !!packImage(this.packBackground()!.path);
+  }
+
+  /** CSS background for a sprite from the pack. */
+  protected sprite(path: string): string | null {
+    const c = packCanvas(path);
+    return c ? `url(${c.toDataURL()})` : null;
+  }
+
+  private applyPackBackground(): void {
+    const bg = this.packBackground();
+    const img = bg ? packImage(bg.path) : undefined;
+    if (!bg || !img || !packActive()) return;
+    const c = document.createElement('canvas');
+    c.width = this.panelWidth; c.height = this.panelHeight;
+    const g = c.getContext('2d')!;
+    const src = packCanvas(bg.path)!;
+    let y = 0;
+    for (const [sx, sy, w, h] of bg.parts ?? [[0, 0, this.panelWidth, this.panelHeight]]) {
+      g.drawImage(src, sx, sy, w, h, 0, y, w, h);
+      y += h;
+    }
+    g.fillStyle = 'rgb(198,198,198)';
+    for (const [x, yy, w, h] of bg.cover ?? []) g.fillRect(x, yy, w, h);
+    this.panel.classList.add('textured');
+    this.panel.style.backgroundImage = `url(${c.toDataURL()})`;
+  }
+
   /** Groups to try, in order, when shift-clicking a slot of `group`. */
   protected abstract shiftTargets(stack: ItemStack, group: string): string[];
 
@@ -75,6 +117,7 @@ export abstract class ContainerScreen extends Screen {
     this.panel.style.width = `${this.panelWidth}px`;
     this.panel.style.height = `${this.panelHeight}px`;
     this.slots = [];
+    this.applyPackBackground();
     this.build();
     this.views = [];
     this.slotEls = [];
@@ -135,6 +178,10 @@ export abstract class ContainerScreen extends Screen {
   private onSlotClick(i: number, button: ClickButton, shift: boolean): void {
     const s = this.slots[i];
     const ui = this.ui;
+    if (s.click && s.click(button, shift)) {
+      this.refresh();
+      return;
+    }
     if (s.output) {
       const out = s.get();
       if (isEmpty(out)) return;

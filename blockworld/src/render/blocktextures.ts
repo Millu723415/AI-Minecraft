@@ -4,6 +4,7 @@
  * hard-edged look of an early-2010s PC voxel game - not photorealism.
  */
 
+import { packBlockTile } from './pack';
 import { DYE_COLOR_RGB } from '../blocks/ids';
 import { PixelTile, TINT_ALPHA, hex, mix, shade, type RGB } from './pixel';
 
@@ -936,6 +937,7 @@ export function blockTextureNames(): string[] {
 
 export function paintBlockTexture(name: string): PixelTile {
   const tile = new PixelTile(name);
+  if (packBlockTile(name, tile)) return tile;
   const painter = painters.get(name) ?? painters.get('missing')!;
   painter(tile);
   return tile;

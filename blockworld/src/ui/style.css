@@ -176,6 +176,10 @@ html, body {
   box-sizing: content-box;
 }
 .slot.big { width: 24px; height: 24px; }
+/* Screens drawn on a resource-pack GUI texture: the texture provides frames. */
+.panel.textured { background-color: transparent; background-repeat: no-repeat; border: none; box-shadow: none; border-radius: 0; image-rendering: pixelated; }
+.panel.textured .slot { background: transparent; box-shadow: none; }
+.panel.textured .slot .ghost { display: none; }
 .slot.big .item { left: 4px; top: 4px; }
 .slot:hover::after {
   content: '';
@@ -240,6 +244,16 @@ html, body {
 }
 
 /* ---- HUD --------------------------------------------------------------- */
+/* Resource-pack HUD sprites replace the drawn frames. */
+.hud.packed .hotbar { background: none no-repeat; border: none; image-rendering: pixelated; }
+.hud.packed .hotbar .hslot { top: 3px; box-shadow: none; }
+.hud.packed .hotbar-select { width: 24px; height: 23px; top: -1px; border: none; outline: none; box-shadow: none; background: none no-repeat; image-rendering: pixelated; }
+.hud.packed .crosshair { width: 15px; height: 15px; background-repeat: no-repeat; image-rendering: pixelated; }
+.hud.packed .crosshair::before, .hud.packed .crosshair::after { display: none; }
+.hud.packed .xpbar { border: none; background-color: transparent; background-repeat: no-repeat; image-rendering: pixelated; }
+.hud.packed .xpbar > div { height: 5px; background-color: transparent; background-repeat: no-repeat; box-shadow: none; image-rendering: pixelated; }
+.hud.packed .bossbar { border: none; background-color: transparent; background-repeat: no-repeat; image-rendering: pixelated; }
+.hud.packed .bossbar > div { background-color: transparent; background-repeat: no-repeat; box-shadow: none; image-rendering: pixelated; }
 .hud { position: absolute; inset: 0; pointer-events: none; }
 .crosshair {
   position: absolute;
@@ -382,4 +396,7 @@ html, body {
 .enchant-option .cost { position: absolute; right: 2px; bottom: 1px; color: #80ff20; text-shadow: 1px 1px 0 #3f3f3f; }
 .enchant-option.disabled .cost { color: #407f10; }
 .enchant-option .runes { position: absolute; left: 20px; top: 1px; font-size: 8px; letter-spacing: 1px; opacity: 0.9; }
+.enchant-option.packed { border: none; background: var(--ench-slot-off) no-repeat; image-rendering: pixelated; }
+.enchant-option.packed.ok { background: var(--ench-slot) no-repeat; }
+.enchant-option.packed.ok:hover { background: var(--ench-slot-hi) no-repeat; }
 .enchant-option .lvlnum { position: absolute; left: 2px; top: 2px; color: #80ff20; }

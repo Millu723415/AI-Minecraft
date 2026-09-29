@@ -7,6 +7,7 @@ import { el } from './dom';
 import { hudIcons } from './hudicons';
 import { ItemView } from './itemview';
 import { fireCanvas } from '../render/firetex';
+import { packActive, packCanvas } from '../render/pack';
 
 export interface BossInfo { name: string; health: number; maxHealth: number }
 
@@ -98,14 +99,38 @@ export class HUD {
     this.messages = el('div', 'messages', this.root);
     this.debug = el('div', 'debug-overlay', this.root);
     this.effects = el('div', 'effects', this.root);
+    this.applyPack();
+  }
+
+  /** Use the resource pack's HUD sprites for the hotbar, crosshair and bars. */
+  private applyPack(): void {
+    if (!packActive()) return;
+    const url = (p: string) => { const c = packCanvas(p); return c ? `url(${c.toDataURL()})` : null; };
+    const hotbar = url('gui/sprites/hud/hotbar');
+    const sel = url('gui/sprites/hud/hotbar_selection');
+    const cross = url('gui/sprites/hud/crosshair');
+    const xpBg = url('gui/sprites/hud/experience_bar_background');
+    const xpFg = url('gui/sprites/hud/experience_bar_progress');
+    const bossBg = url('gui/sprites/boss_bar/pink_background');
+    const bossFg = url('gui/sprites/boss_bar/pink_progress');
+    if (hotbar && sel) {
+      this.root.classList.add('packed');
+      this.hotbar.style.backgroundImage = hotbar;
+      this.select.style.backgroundImage = sel;
+      this.hotbarViews.forEach((_, i) => { (this.hotbar.children[i] as HTMLElement).style.left = `${3 + i * 20}px`; });
+    }
+    if (cross) this.crosshair.style.backgroundImage = cross;
+    if (xpBg && xpFg) { this.xpBar.style.backgroundImage = xpBg; this.xpFill.style.backgroundImage = xpFg; }
+    if (bossBg && bossFg) { this.boss.style.backgroundImage = bossBg; this.bossFill.style.backgroundImage = bossFg; }
   }
 
   layout(w: number, h: number): void {
     this.width = w;
     this.height = h;
     const cx = Math.floor(w / 2);
-    this.crosshair.style.left = `${cx - 4}px`;
-    this.crosshair.style.top = `${Math.floor(h / 2) - 4}px`;
+    const ch = this.root.classList.contains('packed') ? 7 : 4;
+    this.crosshair.style.left = `${cx - ch}px`;
+    this.crosshair.style.top = `${Math.floor(h / 2) - ch}px`;
     this.hotbar.style.left = `${cx - 91}px`;
     this.hotbar.style.top = `${h - 22}px`;
     this.xpBar.style.left = `${cx - 91}px`;

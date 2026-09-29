@@ -3,17 +3,18 @@
 import { BlockId } from '../../blocks/ids';
 import { ItemId } from '../../items/ids';
 import { Container } from '../../items/container';
-import { getItem } from '../../items/registry';
-import { canMerge, cloneStack, isEmpty, type ItemStack } from '../../items/stack';
+import { allItems, getItem } from '../../items/registry';
+import { canMerge, cloneStack, createStack, isEmpty, maxStackSize, type ItemStack } from '../../items/stack';
 import { consumeIngredients, craftingResult, findSmelting, fuelTicks } from '../../recipes/crafting';
 import { enchantCosts, isEnchantable, selectEnchantments } from '../../items/enchantments';
 import { isBrewingIngredient } from '../../game/brewing';
 import type { Dimension } from '../../world/dimension';
 import type { BrewingTile, ChestTile, FurnaceTile } from '../../world/tileentity';
-import { el } from '../dom';
+import { button, el } from '../dom';
 import { ContainerScreen, type SlotDef } from '../screen';
 import { iconCanvas } from '../icons';
 import { rollLoot } from '../../worldgen/loot';
+import { packCanvas } from '../../render/pack';
 
 function ghostIcon(id: number): HTMLCanvasElement {
   return iconCanvas(id, 0);
@@ -89,21 +90,32 @@ export class InventoryScreen extends CraftingScreenBase {
         get: () => inv.armor.get(i), set: (s) => inv.armor.set(i, s), ghost: ghostIcon(armorIcons[i]),
       });
     }
-    this.label('Crafting', 86, 16);
-    this.addGrid(88, 26);
-    this.addOutput(144, 36);
-    // Arrow between grid and output.
-    const arrow = el('div', 'label', this.panel, '→');
-    arrow.textContent = '=>';
-    arrow.style.left = '126px';
-    arrow.style.top = '40px';
+    if (this.textured) {
+      // Vanilla-style layout of the pack's inventory texture.
+      this.label('Crafting', 97, 8);
+      this.addGrid(98, 18);
+      this.addOutput(154, 28);
+    } else {
+      this.label('Crafting', 86, 16);
+      this.addGrid(88, 26);
+      this.addOutput(144, 36);
+      const arrow = el('div', 'label', this.panel, '=>');
+      arrow.style.left = '126px';
+      arrow.style.top = '40px';
+    }
     // Player figure area.
     const box = el('div', '', this.panel);
     Object.assign(box.style, { position: 'absolute', left: '26px', top: '8px', width: '52px', height: '70px', background: '#000', boxShadow: '-1px -1px 0 #373737, 1px 1px 0 #fff' });
+    if (this.textured) Object.assign(box.style, { width: '49px', background: 'transparent', boxShadow: 'none' });
     const fig = el('canvas', '', box) as HTMLCanvasElement;
     fig.width = 52; fig.height = 70;
-    drawFigure(fig);
+    if (!drawSkinFigure(fig)) drawFigure(fig);
     this.addPlayerInventory(8, 84);
+  }
+
+  protected override packBackground() {
+    // The off-hand slot of the modern texture is painted over (no off-hand in this era).
+    return { path: 'gui/container/inventory', cover: [[76, 61, 18, 18]] as [number, number, number, number][] };
   }
 
   protected shiftTargets(stack: ItemStack, group: string): string[] {
@@ -115,6 +127,20 @@ export class InventoryScreen extends CraftingScreenBase {
       default: return ['main', 'hotbar'];
     }
   }
+}
+
+/** Front view of the player skin from the resource pack (if present). */
+function drawSkinFigure(c: HTMLCanvasElement): boolean {
+  const skin = packCanvas('entity/player/wide/steve');
+  if (!skin) return false;
+  const g = c.getContext('2d')!;
+  g.imageSmoothingEnabled = false;
+  const part = (sx: number, sy: number, w: number, h: number, dx: number, dy: number) => g.drawImage(skin, sx, sy, w, h, dx * 2 + 2, dy * 2 + 3, w * 2, h * 2);
+  part(8, 8, 8, 8, 8, 0); part(40, 8, 8, 8, 8, 0); // head + hat
+  part(20, 20, 8, 12, 8, 8); // body
+  part(44, 20, 4, 12, 4, 8); part(36, 52, 4, 12, 16, 8); // arms
+  part(4, 20, 4, 12, 8, 20); part(20, 52, 4, 12, 12, 20); // legs
+  return true;
 }
 
 /** A simple original pixel figure standing in the inventory preview box. */
@@ -135,6 +161,10 @@ function drawFigure(c: HTMLCanvasElement): void {
 }
 
 export class CraftingTableScreen extends CraftingScreenBase {
+  protected override packBackground() {
+    return { path: 'gui/container/crafting_table' };
+  }
+
   constructor() {
     super(176, 166, 3);
   }
@@ -144,6 +174,7 @@ export class CraftingTableScreen extends CraftingScreenBase {
     this.addGrid(30, 17);
     this.addOutput(124, 35);
     const arrow = this.label('=>', 92, 39);
+    if (this.textured) arrow.style.display = 'none';
     arrow.style.color = '#8b8b8b';
     this.label('Inventory', 8, 72);
     this.addPlayerInventory(8, 84);
@@ -180,6 +211,16 @@ export class FurnaceScreen extends ContainerScreen {
         this.ui.host.onSmelted?.(taken, t);
       },
     });
+    if (this.textured) {
+      // Sprites over the texture's empty flame and arrow.
+      this.flame = el('div', '', this.panel);
+      Object.assign(this.flame.style, { position: 'absolute', left: '56px', width: '14px', backgroundImage: this.sprite('gui/sprites/container/furnace/lit_progress') ?? '', backgroundRepeat: 'no-repeat' });
+      this.arrow = el('div', '', this.panel);
+      Object.assign(this.arrow.style, { position: 'absolute', left: '79px', top: '34px', height: '16px', backgroundImage: this.sprite('gui/sprites/container/furnace/burn_progress') ?? '', backgroundRepeat: 'no-repeat' });
+      this.label('Inventory', 8, 72);
+      this.addPlayerInventory(8, 84);
+      return;
+    }
     const flameBox = el('div', '', this.panel);
     Object.assign(flameBox.style, { position: 'absolute', left: '56px', top: '36px', width: '14px', height: '14px', background: '#8b8b8b' });
     this.flame = el('div', '', flameBox);
@@ -209,14 +250,31 @@ export class FurnaceScreen extends ContainerScreen {
     super.update(dt);
     const t = this.tile;
     const f = t.burnTotal > 0 ? t.burnTime / t.burnTotal : 0;
+    if (this.textured) {
+      const h = t.burnTime > 0 ? Math.ceil(f * 13) + 1 : 0;
+      this.flame.style.top = `${36 + 14 - h}px`;
+      this.flame.style.height = `${h}px`;
+      this.flame.style.backgroundPosition = `0 ${-(14 - h)}px`;
+      this.arrow.style.width = `${Math.ceil((t.cookTime / 200) * 24)}px`;
+      return;
+    }
     this.flame.style.height = `${Math.ceil(f * 13)}px`;
     this.arrow.style.width = `${Math.floor((t.cookTime / 200) * 22)}px`;
+  }
+
+  protected override packBackground() {
+    return { path: 'gui/container/furnace' };
   }
 }
 
 export class ChestScreen extends ContainerScreen {
   constructor(private readonly tiles: ChestTile[], private readonly title: string) {
     super(176, 114 + tiles.length * 3 * 18);
+  }
+
+  protected override packBackground() {
+    const rows = this.tiles.length * 3;
+    return { path: 'gui/container/generic_54', parts: [[0, 0, 176, rows * 18 + 17], [0, 126, 176, 96]] as [number, number, number, number][] };
   }
 
   override onOpen(): void {
@@ -266,15 +324,20 @@ export class BrewingScreen extends ContainerScreen {
     const t = this.tile;
     this.label('Brewing Stand', 56, 6);
     const potionRule = { maxStack: 1, accepts: (s: ItemStack) => s.id === ItemId.POTION || s.id === ItemId.GLASS_BOTTLE };
-    const pos = [[56, 46], [79, 53], [102, 46]];
+    const pos = this.textured ? [[56, 51], [79, 58], [102, 51]] : [[56, 46], [79, 53], [102, 46]];
     pos.forEach(([x, y], i) => {
       this.slots.push({ x, y, group: 'bottle', rules: potionRule, get: () => t.items.get(i), set: (s) => t.items.set(i, s), ghost: iconCanvas(ItemId.GLASS_BOTTLE, 0) });
     });
     this.slots.push({ x: 79, y: 17, group: 'ingredient', rules: { accepts: (s) => isBrewingIngredient(s.id) }, get: () => t.items.get(3), set: (s) => t.items.set(3, s) });
-    const barBox = el('div', '', this.panel);
-    Object.assign(barBox.style, { position: 'absolute', left: '98px', top: '16px', width: '7px', height: '28px', background: '#8b8b8b' });
-    this.bar = el('div', '', barBox);
-    Object.assign(this.bar.style, { position: 'absolute', left: '0', top: '0', width: '7px', background: '#fff' });
+    if (this.textured) {
+      this.bar = el('div', '', this.panel);
+      Object.assign(this.bar.style, { position: 'absolute', left: '97px', top: '16px', width: '9px', backgroundImage: this.sprite('gui/sprites/container/brewing_stand/brew_progress') ?? '', backgroundRepeat: 'no-repeat' });
+    } else {
+      const barBox = el('div', '', this.panel);
+      Object.assign(barBox.style, { position: 'absolute', left: '98px', top: '16px', width: '7px', height: '28px', background: '#8b8b8b' });
+      this.bar = el('div', '', barBox);
+      Object.assign(this.bar.style, { position: 'absolute', left: '0', top: '0', width: '7px', background: '#fff' });
+    }
     this.label('Inventory', 8, 72);
     this.addPlayerInventory(8, 84);
   }
@@ -293,6 +356,11 @@ export class BrewingScreen extends ContainerScreen {
     const f = this.tile.brewTime > 0 ? 1 - this.tile.brewTime / 400 : 0;
     this.bar.style.height = `${Math.floor(f * 28)}px`;
   }
+
+  protected override packBackground() {
+    // Blaze-powder fuel arrived after this era: its slot and gauge are blanked.
+    return { path: 'gui/container/brewing_stand', cover: [[16, 16, 18, 18], [59, 43, 20, 6]] as [number, number, number, number][] };
+  }
 }
 
 const RUNES = 'abcdefghijklmnopqrstuvwxyz';
@@ -307,15 +375,31 @@ export class EnchantScreen extends ContainerScreen {
     super(176, 166);
   }
 
+  protected override packBackground() {
+    // Enchanting used only experience levels in this era: the lapis slot is blanked.
+    return { path: 'gui/container/enchanting_table', cover: [[34, 46, 18, 18]] as [number, number, number, number][] };
+  }
+
+  override onOpen(): void {
+    super.onOpen();
+    if (!this.textured) return;
+    const css = (n: string) => this.sprite(`gui/sprites/container/enchanting_table/${n}`) ?? '';
+    const r = document.documentElement.style;
+    r.setProperty('--ench-slot', css('enchantment_slot'));
+    r.setProperty('--ench-slot-hi', css('enchantment_slot_highlighted'));
+    r.setProperty('--ench-slot-off', css('enchantment_slot_disabled'));
+  }
+
   protected build(): void {
     this.label('Enchant', 12, 6);
-    this.slots.push({ x: 25, y: 47, group: 'item', rules: { maxStack: 1 }, get: () => this.item.get(0), set: (s) => this.item.set(0, s) });
+    this.slots.push({ x: this.textured ? 15 : 25, y: 47, group: 'item', rules: { maxStack: 1 }, get: () => this.item.get(0), set: (s) => this.item.set(0, s) });
     this.options = [];
     for (let i = 0; i < 3; i++) {
       const o = el('div', 'enchant-option', this.panel);
       o.style.left = '60px';
       o.style.top = `${14 + i * 19}px`;
       o.addEventListener('mousedown', (e) => { e.stopPropagation(); this.choose(i); });
+      if (this.textured) o.classList.add('packed');
       this.options.push(o);
     }
     this.label('Inventory', 8, 72);
@@ -370,7 +454,7 @@ export class EnchantScreen extends ContainerScreen {
       o.textContent = '';
       const cost = this.costs[i];
       const ok = enchantable && cost > 0 && (p.xpLevel >= cost || p.creative);
-      o.className = `enchant-option${ok ? ' ok' : enchantable ? ' disabled' : ''}`;
+      o.className = `enchant-option${ok ? ' ok' : enchantable ? ' disabled' : ''}${this.textured ? ' packed' : ''}`;
       if (!enchantable) return;
       let runes = '';
       let seed = (cost * 131 + i * 17) >>> 0;
@@ -396,3 +480,88 @@ export class EnchantScreen extends ContainerScreen {
 }
 
 export { isEmpty, canMerge };
+
+
+/** Blocks and items the creative palette hides (technical or from later eras). */
+const CREATIVE_HIDDEN = new Set<number>([
+  BlockId.BEDROCK, BlockId.SPAWNER, BlockId.MONSTER_EGG, BlockId.DRAGON_EGG, BlockId.WOODEN_BUTTON,
+  BlockId.SANDSTONE_STAIRS, ItemId.CHARCOAL,
+]);
+const CREATIVE_VARIANTS: Record<number, number[]> = {
+  [BlockId.WOOL]: Array.from({ length: 16 }, (_, i) => i),
+  [ItemId.DYE]: Array.from({ length: 16 }, (_, i) => i),
+  [BlockId.LOG]: [0, 1, 2],
+  [BlockId.LEAVES]: [0, 1, 2],
+  [BlockId.SAPLING]: [0, 1, 2],
+  [BlockId.SLAB]: [0, 1, 2, 3, 4, 5],
+  [BlockId.STONE_BRICKS]: [0, 1, 2],
+  [ItemId.POTION]: [0, 1, 4, 5, 6, 8, 10],
+};
+
+function creativePalette(): ItemStack[] {
+  const out: ItemStack[] = [];
+  const defs = allItems().filter((d) => !CREATIVE_HIDDEN.has(d.id));
+  defs.sort((a, b) => (a.id < 256 ? 0 : 1) - (b.id < 256 ? 0 : 1) || a.id - b.id);
+  for (const d of defs) {
+    for (const meta of CREATIVE_VARIANTS[d.id] ?? [0]) out.push(createStack(d.id, 1, meta));
+  }
+  return out;
+}
+
+/** Creative mode: take any item from a paged palette into the hotbar. */
+export class CreativeScreen extends ContainerScreen {
+  private page = 0;
+  private readonly palette = creativePalette();
+  private pageLabel!: HTMLDivElement;
+  private static readonly PER_PAGE = 45;
+
+  constructor() {
+    super(176, 152);
+  }
+
+  protected build(): void {
+    const inv = this.ui.host.player.inventory;
+    this.label('Creative Inventory', 8, 5);
+    for (let k = 0; k < CreativeScreen.PER_PAGE; k++) {
+      const col = k % 9; const row = Math.floor(k / 9);
+      this.slots.push({
+        x: 8 + col * 18, y: 17 + row * 18, group: 'palette',
+        get: () => this.palette[this.page * CreativeScreen.PER_PAGE + k] ?? null,
+        set: () => undefined,
+        click: (btn, shift) => {
+          const ui = this.ui;
+          // Clicking the palette while holding something throws it away.
+          if (ui.cursor) { ui.cursor = null; return true; }
+          const item = this.palette[this.page * CreativeScreen.PER_PAGE + k];
+          if (!item) return true;
+          const stack = cloneStack(item)!;
+          stack.count = btn === 'right' ? 1 : maxStackSize(stack);
+          if (shift) inv.addItem(stack); else ui.cursor = stack;
+          return true;
+        },
+      });
+    }
+    for (let col = 0; col < 9; col++) {
+      this.slots.push({ x: 8 + col * 18, y: 128, get: () => inv.get(col), set: (st) => inv.set(col, st), group: 'hotbar' });
+    }
+    const pages = Math.ceil(this.palette.length / CreativeScreen.PER_PAGE);
+    const nav = el('div', '', this.panel);
+    Object.assign(nav.style, { position: 'absolute', left: '8px', top: '108px', width: '160px', height: '14px' });
+    const prev = button(nav, '<', () => { this.page = (this.page + pages - 1) % pages; this.updatePage(pages); }, 20);
+    Object.assign(prev.style, { position: 'absolute', left: '0', top: '0', height: '14px', lineHeight: '12px' });
+    const next = button(nav, '>', () => { this.page = (this.page + 1) % pages; this.updatePage(pages); }, 20);
+    Object.assign(next.style, { position: 'absolute', right: '0', top: '0', height: '14px', lineHeight: '12px' });
+    this.pageLabel = el('div', 'label', nav);
+    Object.assign(this.pageLabel.style, { left: '56px', top: '2px' });
+    this.updatePage(pages);
+  }
+
+  private updatePage(pages: number): void {
+    if (this.pageLabel) this.pageLabel.textContent = `Page ${this.page + 1} / ${pages}`;
+    this.refresh();
+  }
+
+  protected shiftTargets(_stack: ItemStack, group: string): string[] {
+    return group === 'hotbar' ? [] : ['hotbar'];
+  }
+}

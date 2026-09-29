@@ -17,15 +17,18 @@ export function blockIndex(x: number, y: number, z: number): number {
   return x | (z << 4) | (y << 8);
 }
 
-/** Pack chunk coordinates into a single number usable as a Map key. */
+/**
+ * Pack chunk coordinates into a single number usable as a Map key. The result
+ * stays below 2^30 so engines keep it as a small integer (no boxing), which
+ * matters because lighting and meshing look chunks up constantly. Covers
+ * chunk coordinates within +-16384 (+-262144 blocks).
+ */
 export function chunkKey(cx: number, cz: number): number {
-  return (cx + 32768) * 65536 + (cz + 32768);
+  return ((cx + 16384) << 15) | ((cz + 16384) & 32767);
 }
 
 export function unpackChunkKey(key: number): [number, number] {
-  const cx = Math.floor(key / 65536) - 32768;
-  const cz = (key % 65536) - 32768;
-  return [cx, cz];
+  return [(key >> 15) - 16384, (key & 32767) - 16384];
 }
 
 /** Face directions shared by mesher, lighting and interaction code. */

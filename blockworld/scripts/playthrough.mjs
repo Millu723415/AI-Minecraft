@@ -130,9 +130,11 @@ const filled = await ev(async (r) => {
     if (d.getBlock(x, r.cy, z) !== 120) continue;
     frames++;
     if (d.getMeta(x, r.cy, z) & 4) continue;
-    // Stand beside the frame and look at its top face.
-    p.setPosition(x + 0.5 + (x - r.cx) * 0.6, r.cy, z + 0.5 + (z - r.cz) * 0.6);
+    // Stand on a neighbouring frame of the ring and look down at this one.
+    const [nx, nz] = ring.find(([ax, az]) => Math.abs(ax - x) + Math.abs(az - z) === 1);
+    p.setPosition(nx + 0.5, r.cy + 0.82, nz + 0.5);
     p.motionX = p.motionY = p.motionZ = 0;
+    await T.wait(300);
     p.inventory.set(p.inventory.selected, { id: 381, count: 1, meta: 0, damage: 0 });
     T.aimAt(x + 0.5, r.cy + 0.75, z + 0.5);
     await T.use();

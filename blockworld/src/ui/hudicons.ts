@@ -1,3 +1,4 @@
+import { packActive, packCanvas } from '../render/pack';
 /** Original 9x9 HUD icons: hearts, hunger shanks, armor and air bubbles. */
 
 type Pal = Record<string, string>;
@@ -138,7 +139,25 @@ export interface HudIcons {
 }
 
 let icons: HudIcons | null = null;
+/** HUD sprites from the resource pack, when one is loaded. */
+function packIcons(): HudIcons | null {
+  if (!packActive()) return null;
+  const h = (n: string) => packCanvas(`gui/sprites/hud/${n}`);
+  const all = {
+    heartEmpty: h('heart/container'), heartFlash: h('heart/container_blinking'), heartFull: h('heart/full'),
+    heartHalf: h('heart/half'), heartPoisonFull: h('heart/poisoned_full'), heartPoisonHalf: h('heart/poisoned_half'),
+    shankEmpty: h('food_empty'), shankFull: h('food_full'), shankHalf: h('food_half'),
+    shankHungerFull: h('food_full_hunger'), shankHungerHalf: h('food_half_hunger'),
+    armorEmpty: h('armor_empty'), armorFull: h('armor_full'), armorHalf: h('armor_half'),
+    bubble: h('air'), bubblePop: h('air_bursting'),
+  };
+  if (Object.values(all).some((c) => !c)) return null;
+  return all as HudIcons;
+}
+
 export function hudIcons(): HudIcons {
+  if (icons) return icons;
+  icons = packIcons();
   if (icons) return icons;
   const empty = draw(HEART_OUTLINE, { k: '#000', x: '#3a1010' });
   const flash = draw(HEART_OUTLINE, { k: '#fff', x: '#3a1010' });

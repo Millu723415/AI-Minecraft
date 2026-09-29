@@ -42,13 +42,14 @@ import { rleDecode, rleEncode } from '../save/codec';
 import { GAME_VERSION, SAVE_FORMAT_VERSION, chunkRecordKey, type ChunkRecord, type Storage, type WorldRecord } from '../save/storage';
 import type { AudioEngine } from '../audio/audio';
 import type { UIManager, UIHost } from '../ui/manager';
-import { InventoryScreen, CraftingTableScreen, FurnaceScreen, ChestScreen, BrewingScreen, EnchantScreen } from '../ui/screens/containers';
+import { CreativeScreen, InventoryScreen, CraftingTableScreen, FurnaceScreen, ChestScreen, BrewingScreen, EnchantScreen } from '../ui/screens/containers';
 import { SignScreen } from '../ui/screens/sign';
 import type { ChestTile, FurnaceTile, BrewingTile, SignTile } from '../world/tileentity';
 import { daylightFactor } from '../render/sky';
 import { biomeDef } from '../worldgen/biomes';
 import { OverworldGenerator } from '../worldgen/overworld';
 import { MobSystem } from '../entity/mobsystem';
+import { Precip, WeatherRenderer } from '../render/weather';
 import { registerMobModels } from '../render/mobmodels';
 
 registerMobModels();
@@ -88,6 +89,7 @@ export class Game implements GameContext, InteractionHost, UIHost {
   private autosave = 0;
   private screenshotRequested = false;
   private saveChain: Promise<void> = Promise.resolve();
+  private readonly weather = new WeatherRenderer();
   private pendingChunks = new Map<string, ChunkRecord>();
   private pendingEntities = new Map<string, EntityData[]>();
   /** Chunks known to have an entity record in storage. */
@@ -139,6 +141,7 @@ export class Game implements GameContext, InteractionHost, UIHost {
     this.redstone.playNote = (d, x, y, z) => this.interaction.playNote(d, x, y, z);
     this.mobs = new MobSystem(this);
     this.entityRenderer = new EntityRenderer(renderer.blockItemMaterial, renderer.spriteItemMaterial);
+    renderer.scene.add(this.weather.group);
     (window as unknown as { __itemMats: Record<string, unknown> }).__itemMats = { block: renderer.blockItemMaterial, sprite: renderer.spriteItemMaterial };
     renderer.entityGroup.add(this.entityRenderer.group);
     this.particleSystem = new ParticleSystem(renderer.materials.atlas, renderer.materials.uniforms);
@@ -1154,6 +1157,20 @@ export class Game implements GameContext, InteractionHost, UIHost {
     return Math.max(0.03, v + ((1 - Math.pow(1 - v, 3)) - v) * g);
   }
 
+  private updateWeather(x: number, y: number, z: number): void {
+    const strength = this.dim.id === Dim.OVERWORLD ? this.world.rainStrength : 0;
+    const dim = this.dim;
+    this.weather.update(x, y, z, strength, performance.now() / 1000, this.settings.fancyGraphics, (wx, wz) => {
+      const c = dim.getChunkAt(wx, wz);
+      if (!c || !c.lit) return null;
+      const lx = wx & 15; const lz = wz & 15;
+      const b = biomeDef(c.biomes[lx | (lz << 4)]);
+      const kind = !b.rain ? Precip.NONE : b.snowy || b.temperature < 0.15 ? Precip.SNOW : Precip.RAIN;
+      const top = c.heightMap[lx | (lz << 4)];
+      return { top, kind, light: this.brightness(wx + 0.5, Math.max(top, y), wz + 0.5) };
+    });
+  }
+
   /** Save the frame just rendered as a PNG download (F2). */
   private saveScreenshot(): void {
     const canvas = this.renderer.canvas;
@@ -1226,6 +1243,7 @@ export class Game implements GameContext, InteractionHost, UIHost {
       using: this.interaction.useTicks, eating: !!this.interaction.useItem && this.interaction.useItem.id !== 261,
     };
     const showHand = !this.hideGui && !p.sleeping && !p.dead;
+    this.updateWeather(x, eyeY, z);
     this.renderer.render(cam, showHand ? hand : null, this.dim.id, this.world.dayTime, this.world.rainStrength, dt, 1);
     if (p.inPortal && p.portalTime > 0) this.renderer.renderScreenTint(0.5, 0.1, 0.8, Math.min(0.6, p.portalTime / 80));
     this.audio.listener = { x, y: eyeY, z, yaw: p.yaw };
@@ -1287,7 +1305,7 @@ export class Game implements GameContext, InteractionHost, UIHost {
     }
     if (code === k.inventory) {
       if (p.sleeping) return true;
-      this.ui.open(new InventoryScreen());
+      this.ui.open(p.creative ? new CreativeScreen() : new InventoryScreen());
       return true;
     }
     if (code.startsWith('Digit')) {

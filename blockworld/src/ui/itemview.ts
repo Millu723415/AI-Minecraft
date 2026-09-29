@@ -15,7 +15,7 @@ export class ItemView {
   private readonly count: HTMLDivElement;
   private readonly dur: HTMLDivElement;
   private readonly durFill: HTMLDivElement;
-  private key = '';
+  private key = '\u0000init';
 
   constructor(parent: HTMLElement) {
     this.root = el('div', 'item', parent);
