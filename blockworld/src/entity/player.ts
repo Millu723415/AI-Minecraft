@@ -42,6 +42,9 @@ export class Player extends LivingEntity {
   bedSpawn: SpawnPoint | null = null;
   creative = false;
   flying = false;
+  /** Creative flight toggles on a double tap of jump. */
+  private prevJump = false;
+  private jumpTapTimer = 0;
   input: PlayerInput = { forward: 0, strafe: 0, jump: false, sneak: false, sprint: false };
   /** Ticks spent standing in a nether portal. */
   portalTime = 0;
@@ -178,6 +181,12 @@ export class Player extends LivingEntity {
     this.moveStrafe = inp.strafe;
     this.sneaking = inp.sneak && !this.flying;
     this.jumping = inp.jump;
+    if (this.creative && inp.jump && !this.prevJump) {
+      if (this.jumpTapTimer > 0) { this.flying = !this.flying; this.jumpTapTimer = 0; }
+      else this.jumpTapTimer = 7;
+    }
+    if (this.jumpTapTimer > 0) this.jumpTapTimer--;
+    this.prevJump = inp.jump;
     const canSprint = (this.foodLevel > 6 || this.creative) && inp.forward > 0.8 && !this.sneaking && !this.usingItem;
     if (inp.sprint && canSprint) this.sprinting = true;
     if (!canSprint || this.collidedH) this.sprinting = false;
@@ -211,7 +220,8 @@ export class Player extends LivingEntity {
     const wasOnGround = this.onGround;
     this.livingTick(ctx);
     if (this.dead) return;
-    if (this.onGround && this.flying && !this.creative) this.flying = false;
+    // Touching the ground ends flight.
+    if (this.onGround && this.flying) this.flying = false;
     // Hunger from movement.
     const dist = Math.sqrt((this.x - x0) ** 2 + (this.z - z0) ** 2);
     if (this.inWater) this.exhaust(0.015 * dist);

@@ -78,11 +78,15 @@ export interface BoxSpec {
   u: number; v: number;
   /** Grow the box in every direction (armour/wool overlays). */
   inflate?: number;
+  /** Mirrored texture: side faces swap regions and every face flips horizontally. */
   mirror?: boolean;
+  /** Static transform applied to the box corners (relative to the part pivot). */
+  mat?: THREE.Matrix4;
 }
 
 /** Build geometry for one or more boxes (pixel units) with skin UVs. */
 export function boxGeometry(boxes: BoxSpec[], texW: number, texH: number): THREE.BufferGeometry {
+  const tmp = new THREE.Vector3();
   const pos: number[] = [];
   const uv: number[] = [];
   const idx: number[] = [];
@@ -92,6 +96,8 @@ export function boxGeometry(boxes: BoxSpec[], texW: number, texH: number): THREE
     const y0 = b.y - g; const y1 = b.y + b.h + g;
     const z0 = b.z - g; const z1 = b.z + b.d + g;
     const { u, v, w, h, d } = b;
+    const rightUV: [number, number, number, number] = [u, v + d, u + d, v + d + h];
+    const leftUV: [number, number, number, number] = [u + d + w, v + d, u + 2 * d + w, v + d + h];
     // Each face: 4 corners (bl, br, tr, tl as seen from outside) + uv rect [u0,v0,u1,v1].
     const faces: [number[][], [number, number, number, number]][] = [
       // front (-Z): viewer left = +X
@@ -99,9 +105,9 @@ export function boxGeometry(boxes: BoxSpec[], texW: number, texH: number): THREE
       // back (+Z): viewer left = -X
       [[[x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1]], [u + 2 * d + w, v + d, u + 2 * d + 2 * w, v + d + h]],
       // right (+X): viewer left = +Z
-      [[[x1, y0, z1], [x1, y0, z0], [x1, y1, z0], [x1, y1, z1]], [u, v + d, u + d, v + d + h]],
+      [[[x1, y0, z1], [x1, y0, z0], [x1, y1, z0], [x1, y1, z1]], b.mirror ? leftUV : rightUV],
       // left (-X): viewer left = -Z
-      [[[x0, y0, z0], [x0, y0, z1], [x0, y1, z1], [x0, y1, z0]], [u + d + w, v + d, u + 2 * d + w, v + d + h]],
+      [[[x0, y0, z0], [x0, y0, z1], [x0, y1, z1], [x0, y1, z0]], b.mirror ? rightUV : leftUV],
       // top: bottom edge of the region adjoins the front face
       [[[x1, y1, z0], [x0, y1, z0], [x0, y1, z1], [x1, y1, z1]], [u + d, v + d, u + d + w, v]],
       // bottom
@@ -114,7 +120,12 @@ export function boxGeometry(boxes: BoxSpec[], texW: number, texH: number): THREE
       const va = b0 / texH; const vb = b1 / texH;
       const uvs = [[ua, vb], [ub, vb], [ub, va], [ua, va]];
       for (let i = 0; i < 4; i++) {
-        pos.push(corners[i][0], corners[i][1], corners[i][2]);
+        if (b.mat) {
+          tmp.set(corners[i][0], corners[i][1], corners[i][2]).applyMatrix4(b.mat);
+          pos.push(tmp.x, tmp.y, tmp.z);
+        } else {
+          pos.push(corners[i][0], corners[i][1], corners[i][2]);
+        }
         uv.push(uvs[i][0], 1 - uvs[i][1]);
       }
       idx.push(base, base + 1, base + 2, base, base + 2, base + 3);

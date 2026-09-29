@@ -10,6 +10,8 @@ import { SkyRenderer } from './sky';
 import { tileOf, tileUV } from './tiles';
 import { itemGeometry } from './itemmesh';
 import { itemAtlas } from './itematlas';
+import { boxGeometry } from './skin';
+import { playerSkinTexture } from './mobmodels';
 import type { Box } from '../blocks/types';
 import type { ItemStack } from '../items/stack';
 import type { DimId } from '../world/constants';
@@ -38,6 +40,8 @@ export interface HandState {
 export class Renderer {
   readonly gl: THREE.WebGLRenderer;
   readonly scene = new THREE.Scene();
+  private readonly skyScene = new THREE.Scene();
+  private readonly skyCamera = new THREE.PerspectiveCamera(70, 1, 1, 1200);
   readonly camera: THREE.PerspectiveCamera;
   readonly materials: TerrainMaterials;
   readonly chunks: ChunkRenderer;
@@ -77,6 +81,7 @@ export class Renderer {
     this.chunks = new ChunkRenderer(this.materials);
     this.sky = new SkyRenderer();
     this.scene.add(this.sky.group, this.chunks.group, this.entityGroup, this.particleGroup, this.overlayGroup);
+    this.skyScene.add(this.sky.farGroup);
     this.scene.fog = new THREE.Fog(0xb0c8ff, 60, 120);
 
     // Selection outline.
@@ -104,8 +109,14 @@ export class Renderer {
     // First-person hand.
     this.handCamera = new THREE.PerspectiveCamera(70, 1, 0.01, 10);
     this.handScene.add(this.handGroup);
-    const armMat = new THREE.MeshBasicMaterial({ color: 0xc89878 });
-    this.armMesh = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.25, 0.8), armMat);
+    // Right arm of the player skin, laid along -Z with the hand away from the eye.
+    const skin = playerSkinTexture();
+    const armMat = new THREE.MeshBasicMaterial({ map: skin.texture, alphaTest: 0.1 });
+    const armGeo = boxGeometry([{ x: -2, y: -10, z: -2, w: 4, h: 12, d: 4, u: 40, v: 16 }], skin.texW, skin.texH);
+    armGeo.rotateX(Math.PI / 2);
+    armGeo.translate(0, 0, 4);
+    armGeo.scale(0.8 / 12, 0.8 / 12, 0.8 / 12);
+    this.armMesh = new THREE.Mesh(armGeo, armMat);
     this.handGroup.add(this.armMesh);
 
     // Full-screen tint quad for underwater / lava / portal effects.
@@ -178,7 +189,7 @@ export class Renderer {
     const light = Math.max(0.25, state.light);
     this.handBlockMat.color.setScalar(light);
     this.handSpriteMat.color.setScalar(light);
-    (this.armMesh.material as THREE.MeshBasicMaterial).color.setRGB(0.78 * light, 0.6 * light, 0.47 * light);
+    (this.armMesh.material as THREE.MeshBasicMaterial).color.setScalar(light);
 
     // Classic swing: arc down and in, with a small twist.
     const s = state.swing;
@@ -256,6 +267,17 @@ export class Renderer {
 
     this.gl.setClearColor(cam.underwater || cam.inLava ? fogColor : skyState.skyColor, 1);
     this.gl.clear();
+    if (!cam.underwater && !cam.inLava) {
+      // Far sky with its own depth range, then the world on top.
+      const sc = this.skyCamera;
+      sc.fov = c.fov; sc.aspect = c.aspect;
+      sc.updateProjectionMatrix();
+      sc.position.copy(c.position);
+      sc.quaternion.copy(c.quaternion);
+      sc.updateMatrixWorld();
+      this.gl.render(this.skyScene, sc);
+      this.gl.clearDepth();
+    }
     this.gl.render(this.scene, c);
     this.frameInfo.calls = this.gl.info.render.calls;
     this.frameInfo.triangles = this.gl.info.render.triangles;

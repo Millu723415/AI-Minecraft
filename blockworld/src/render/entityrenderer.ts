@@ -6,6 +6,7 @@
 
 import * as THREE from 'three';
 import { fireTexture } from './firetex';
+import { packActive, packCanvas } from './pack';
 import type { Entity } from '../entity/entity';
 import { ItemEntity, XpOrb, FallingBlock, PrimedTnt } from '../entity/items';
 import { Arrow, Throwable, EyeOfEnderSignal, Fireball } from '../entity/projectiles';
@@ -99,16 +100,29 @@ export class EntityRenderer {
     };
   }
 
-  private xpVisual(_e: XpOrb): EntityVisual {
+  private xpVisual(e: XpOrb): EntityVisual {
     const mat = new THREE.SpriteMaterial({ color: 0xb6ff3c, transparent: true, depthWrite: false });
-    const canvas = document.createElement('canvas');
-    canvas.width = 8; canvas.height = 8;
-    const ctx = canvas.getContext('2d')!;
-    ctx.fillStyle = '#e8ff90'; ctx.fillRect(2, 1, 4, 6); ctx.fillRect(1, 2, 6, 4);
-    ctx.fillStyle = '#60c020'; ctx.fillRect(3, 3, 2, 2);
+    // Resource-pack orbs: a 4x4 sheet of sizes; otherwise a small painted orb.
+    const sheet = packActive() ? packCanvas('entity/experience/experience_orb') : null;
+    let canvas: HTMLCanvasElement;
+    if (sheet) {
+      canvas = sheet;
+    } else {
+      canvas = document.createElement('canvas');
+      canvas.width = 8; canvas.height = 8;
+      const ctx = canvas.getContext('2d')!;
+      ctx.fillStyle = '#e8ff90'; ctx.fillRect(2, 1, 4, 6); ctx.fillRect(1, 2, 6, 4);
+      ctx.fillStyle = '#60c020'; ctx.fillRect(3, 3, 2, 2);
+    }
     const tex = new THREE.CanvasTexture(canvas);
     tex.magFilter = THREE.NearestFilter;
     tex.minFilter = THREE.NearestFilter;
+    tex.colorSpace = THREE.SRGBColorSpace;
+    if (sheet) {
+      const icon = Math.min(15, e.sizeClass);
+      tex.repeat.set(0.25, 0.25);
+      tex.offset.set((icon % 4) * 0.25, 0.75 - Math.floor(icon / 4) * 0.25);
+    }
     mat.map = tex;
     const s = new THREE.Sprite(mat);
     return {
@@ -117,7 +131,7 @@ export class EntityRenderer {
         const orb = ent as XpOrb;
         const [x, y, z] = interpPos(ent, rc.alpha);
         s.position.set(x, y + 0.2, z);
-        const size = 0.15 + orb.sizeClass * 0.03;
+        const size = sheet ? 0.3 : 0.15 + orb.sizeClass * 0.03;
         s.scale.setScalar(size);
         const t = (orb.age + rc.alpha) / 2;
         mat.color.setRGB((Math.sin(t) + 1) * 0.5, 1, (Math.sin(t + 4.18) + 1) * 0.1);

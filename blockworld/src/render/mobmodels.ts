@@ -12,6 +12,8 @@ import { Part, SkinCanvas, type BoxSpec, type RGB } from './skin';
 import { itemGeometry } from './itemmesh';
 import { ItemId } from '../items/ids';
 import { BlockId } from '../blocks/ids';
+import { packActive, packImage } from './pack';
+import { packModelFor, packModelKey, packModelTexture, type PackModel } from './packmodels';
 
 type PartMap = Record<string, Part>;
 
@@ -504,8 +506,8 @@ export const MODEL_DEFS: Record<string, (e: Entity) => ModelDef> = {
       walkLegs(p, ['leg0', 'leg1'], t);
       const flying = !en.onGround;
       const f = flying ? Math.sin(rc.time * 30) * 0.8 + 0.8 : 0;
-      p.rwing.group.rotation.z = -f;
-      p.lwing.group.rotation.z = f;
+      p.rwing.group.rotation.z = f;
+      p.lwing.group.rotation.z = -f;
     },
   }),
   squid: () => {
@@ -831,13 +833,30 @@ function holdItem(part: Part, itemId: number): void {
 function mushroomsOnBack(p: PartMap): void {
   const mat = new THREE.MeshBasicMaterial({ color: 0xc02020 });
   const stem = new THREE.MeshBasicMaterial({ color: 0xe8dcc8 });
+  // Positions are in model space; the body part may have its pivot elsewhere.
+  const o = p.body.group.position;
   for (const [x, z] of [[-2, -3], [3, 2], [-1, 6]]) {
     const cap = new THREE.Mesh(new THREE.BoxGeometry(5, 2, 5), mat);
-    cap.position.set(x, 23, z);
+    cap.position.set(x - o.x, 23 - o.y, z - o.z);
     const st = new THREE.Mesh(new THREE.BoxGeometry(1.5, 3, 1.5), stem);
-    st.position.set(x, 21, z);
+    st.position.set(x - o.x, 21 - o.y, z - o.z);
     p.body.group.add(cap, st);
   }
+}
+
+/** Sheep coat from a resource pack: boxes attached to the matching parts. */
+function packWool(p: PartMap, wool: NonNullable<PackModel['wool']>): void {
+  const mat = new THREE.MeshBasicMaterial({ map: packModelTexture({ layers: [wool.layer], texW: 64, texH: 32 }), alphaTest: 0.1, side: THREE.DoubleSide });
+  const parts: Part[] = [];
+  for (const [name, boxes] of Object.entries(wool.boxes)) {
+    if (!p[name]) continue;
+    const w = new Part(boxes, mat, 64, 32, [0, 0, 0]);
+    w.group.userData.wool = true;
+    p[name].group.add(w.group);
+    parts.push(w);
+  }
+  (p as Record<string, unknown>).__woolMat = mat;
+  (p as Record<string, unknown>).__woolParts = parts;
 }
 
 function addWool(p: PartMap, e: Entity): void {
@@ -892,25 +911,36 @@ class MobModel implements EntityVisual {
   private skinKey: string;
   private carriedMesh: THREE.Mesh | null = null;
   private carriedId = 0;
+  /** Resource-pack model when a pack skin exists for this mob. */
+  private pack: PackModel | null;
 
   constructor(readonly type: string, private def: ModelDef, private readonly entity: Entity) {
+    this.pack = packActive() ? packModelFor(type, entity) : null;
     this.skinKey = this.computeSkinKey(entity);
-    const tex = textureFor(this.skinKey, def);
+    const tex = this.pack ? packModelTexture(this.pack) : textureFor(this.skinKey, def);
     this.material = new THREE.MeshBasicMaterial({
       map: tex, alphaTest: def.transparent ? 0 : 0.1, transparent: !!def.transparent, side: THREE.DoubleSide,
       depthWrite: !def.transparent,
     });
-    for (const pd of def.parts) {
-      const part = new Part(pd.boxes, this.material, def.texW, def.texH, pd.pivot);
+    const texW = this.pack?.texW ?? def.texW;
+    const texH = this.pack?.texH ?? def.texH;
+    for (const pd of this.pack?.parts ?? def.parts) {
+      const part = new Part(pd.boxes, this.material, texW, texH, pd.pivot);
+      if ('scale' in pd && pd.scale) part.group.scale.setScalar(pd.scale);
       this.parts[pd.name] = part;
-      const parent = pd.parent ? this.parts[pd.parent].group : this.inner;
+      const parent = 'parent' in pd && pd.parent ? this.parts[pd.parent].group : this.inner;
       parent.add(part.group);
     }
-    def.extras?.(this.parts, entity);
+    if (this.pack?.wool) packWool(this.parts, this.pack.wool);
+    else def.extras?.(this.parts, entity);
     this.object.add(this.inner);
   }
 
   private computeSkinKey(e: Entity): string {
+    if (this.pack) {
+      const m = packModelFor(this.type, e);
+      if (m) return packModelKey(m);
+    }
     if (e.type === 'wolf') { const w = e as unknown as { tamed: boolean; angry: boolean }; return `wolf:${w.tamed}:${w.angry}`; }
     if (e.type === 'ghast') return `ghast:${(e as unknown as { shooting: number }).shooting > 0}`;
     if (e.type === 'villager') return `villager:${(e as unknown as { profession: number }).profession}`;
@@ -923,7 +953,9 @@ class MobModel implements EntityVisual {
     if (key !== this.skinKey) {
       this.skinKey = key;
       this.def = MODEL_DEFS[this.type](e);
-      this.material.map = textureFor(key, this.def);
+      const pack = this.pack ? packModelFor(this.type, e) : null;
+      if (pack) this.pack = pack;
+      this.material.map = pack ? packModelTexture(pack) : textureFor(key, this.def);
       this.material.needsUpdate = true;
     }
     const [x, y, z] = interpPos(e, rc.alpha);
@@ -970,7 +1002,8 @@ class MobModel implements EntityVisual {
       swing: living.swinging ? living.swingProgress : 0,
     };
     t.headYaw = normalizeAngle((mob.headYaw ?? e.yaw) - bodyYaw);
-    this.def.animate(e, rc, this.parts, t);
+    if (this.pack?.animate) this.pack.animate(e, this.parts, t);
+    else this.def.animate(e, rc, this.parts, t);
     // Sheep wool.
     if (e.type === 'sheep') {
       const sh = e as unknown as { sheared: boolean; woolRgb: readonly [number, number, number] };
@@ -1016,6 +1049,14 @@ function normalizeAngle(a: number): number {
   return a;
 }
 
+/** Player skin texture (pack skin when available) and its size, for the first-person arm. */
+export function playerSkinTexture(): { texture: THREE.Texture; texW: number; texH: number } {
+  const pack = packActive() && packImage('entity/player/wide/steve');
+  if (pack) return { texture: packModelTexture({ layers: ['entity/player/wide/steve'], texW: 64, texH: 64 }), texW: 64, texH: 64 };
+  const def = MODEL_DEFS.player({} as Entity);
+  return { texture: textureFor('player', def), texW: def.texW, texH: def.texH };
+}
+
 /** Register all mob model factories with the entity renderer. */
 export function registerMobModels(): void {
   for (const type of Object.keys(MODEL_DEFS)) {
@@ -1045,17 +1086,24 @@ class DragonModel implements EntityVisual {
 
   constructor(e: Entity) {
     const skinDef: ModelDef = { texW: 256, texH: 256, skin: dragonSkin, parts: [], animate: () => undefined };
-    const tex = textureFor('ender_dragon', skinDef);
-    this.mat = new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide });
+    // A resource-pack dragon skin uses the standard layout: spikes, nostrils,
+    // wing membranes and the heavier hind legs have their own regions.
+    const pack = packActive() && !!packImage('entity/enderdragon/dragon');
+    const tex = pack
+      ? packModelTexture({ layers: ['entity/enderdragon/dragon'], texW: 256, texH: 256 })
+      : textureFor('ender_dragon', skinDef);
+    this.mat = new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide, alphaTest: 0.1 });
     const T = 256;
-    this.body = new Part([B(-12, -12, -32, 24, 24, 64, 0, 0), B(-1, 12, -22, 2, 6, 12, 48, 0), B(-1, 12, -2, 2, 6, 12, 48, 0), B(-1, 12, 18, 2, 6, 12, 48, 0)], this.mat, T, T, [0, 0, 0]);
+    const [su, sv] = pack ? [220, 53] : [48, 0];
+    this.body = new Part([B(-12, -12, -32, 24, 24, 64, 0, 0), B(-1, 12, -22, 2, 6, 12, su, sv), B(-1, 12, -2, 2, 6, 12, su, sv), B(-1, 12, 18, 2, 6, 12, su, sv)], this.mat, T, T, [0, 0, 0]);
     this.root.add(this.body.group);
     for (let i = 0; i < 5; i++) {
       const n = new Part([B(-5, -5, -10, 10, 10, 10, 192, 104), B(-1, 5, -8, 2, 4, 6, 48, 0)], this.mat, T, T, [0, 4, -32 - i * 10]);
       this.neck.push(n);
       this.root.add(n.group);
     }
-    this.head = new Part([B(-8, -4, -16, 16, 16, 16, 112, 30), B(-6, -4, -32, 12, 5, 16, 176, 44), B(-5, 7, -12, 2, 4, 6, 0, 0), B(3, 7, -12, 2, 4, 6, 0, 0)], this.mat, T, T, [0, 4, -82]);
+    const nostrils = pack ? [B(3, 1, -30, 2, 2, 4, 112, 0, { mirror: true }), B(-5, 1, -30, 2, 2, 4, 112, 0)] : [];
+    this.head = new Part([B(-8, -4, -16, 16, 16, 16, 112, 30), B(-6, -4, -32, 12, 5, 16, 176, 44), B(-5, 7, -12, 2, 4, 6, 0, 0), B(3, 7, -12, 2, 4, 6, 0, 0), ...nostrils], this.mat, T, T, [0, 4, -82]);
     this.jaw = new Part([B(-6, -4, -16, 12, 4, 16, 176, 65)], this.mat, T, T, [0, 0, -16]);
     this.head.group.add(this.jaw.group);
     this.root.add(this.head.group);
@@ -1064,15 +1112,21 @@ class DragonModel implements EntityVisual {
       this.tail.push(t);
       this.root.add(t.group);
     }
+    // Pack membranes are flat sheets whose top face region starts at u = 0.
+    const [mu, mh] = pack ? [-56, 0] : [0, 0.5];
     for (const side of [1, -1]) {
-      const arm = new Part([B(side > 0 ? 0 : -56, -4, -4, 56, 8, 8, 112, 88), B(side > 0 ? 0 : -56, 0, 2, 56, 0.5, 56, 0, 88)], this.mat, T, T, [side * 12, 5, -18]);
-      const tip = new Part([B(side > 0 ? 0 : -56, -2, -2, 56, 4, 4, 112, 136), B(side > 0 ? 0 : -56, 0, 2, 56, 0.5, 56, 0, 144)], this.mat, T, T, [side * 56, 0, 0]);
+      const arm = new Part([B(side > 0 ? 0 : -56, -4, -4, 56, 8, 8, 112, 88), B(side > 0 ? 0 : -56, 0, 2, 56, mh, 56, mu, 88)], this.mat, T, T, [side * 12, 5, -18]);
+      const tip = new Part([B(side > 0 ? 0 : -56, -2, -2, 56, 4, 4, 112, 136), B(side > 0 ? 0 : -56, 0, 2, 56, mh, 56, mu, 144)], this.mat, T, T, [side * 56, 0, 0]);
       arm.group.add(tip.group);
       this.wings.push({ arm, tip });
       this.root.add(arm.group);
     }
     for (const [x, z, h] of [[12, -20, 24], [-12, -20, 24], [16, 22, 32], [-16, 22, 32]]) {
-      const leg = new Part([B(-4, -h, -4, 8, h, 8, 112, 104), B(-3, -h - 16, -3, 6, 16, 6, 226, 138), B(-4, -h - 20, -12, 8, 4, 16, 144, 104)], this.mat, T, T, [x, -8, z]);
+      const hind = pack && h === 32;
+      const boxes = hind
+        ? [B(-8, -h, -8, 16, h, 16, 0, 0), B(-6, -h - 16, -6, 12, 16, 12, 196, 0), B(-9, -h - 22, -16, 18, 6, 24, 112, 0)]
+        : [B(-4, -h, -4, 8, h, 8, 112, 104), B(-3, -h - 16, -3, 6, 16, 6, 226, 138), B(-4, -h - 20, -12, 8, 4, 16, 144, 104)];
+      const leg = new Part(boxes, this.mat, T, T, [x, -8, z]);
       this.legs.push(leg);
       this.root.add(leg.group);
     }

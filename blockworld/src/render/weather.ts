@@ -5,6 +5,7 @@
  */
 
 import * as THREE from 'three';
+import { packActive, packCanvas } from './pack';
 
 export const Precip = { NONE: 0, RAIN: 1, SNOW: 2 } as const;
 export type PrecipKind = (typeof Precip)[keyof typeof Precip];
@@ -18,6 +19,8 @@ export interface ColumnSample {
 }
 
 function streakTexture(snow: boolean): THREE.CanvasTexture {
+  const packed = packActive() ? packCanvas(snow ? 'environment/snow' : 'environment/rain') : null;
+  if (packed) return wrapTexture(packed);
   const c = document.createElement('canvas');
   c.width = 16; c.height = 64;
   const g = c.getContext('2d')!;
@@ -36,6 +39,10 @@ function streakTexture(snow: boolean): THREE.CanvasTexture {
       for (let k = 0; k < len; k++) g.fillRect(x, (y + k) % 64, 1, 1);
     }
   }
+  return wrapTexture(c);
+}
+
+function wrapTexture(c: HTMLCanvasElement): THREE.CanvasTexture {
   const t = new THREE.CanvasTexture(c);
   t.magFilter = THREE.NearestFilter;
   t.minFilter = THREE.NearestFilter;

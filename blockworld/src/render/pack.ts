@@ -387,7 +387,9 @@ export const ENTITY_FILES: string[] = [
   'entity/ghast/ghast', 'entity/ghast/ghast_shooting', 'entity/blaze/blaze', 'entity/enderdragon/dragon',
   'entity/villager/villager', 'entity/end_crystal/end_crystal', 'entity/minecart/minecart', 'entity/boat/oak',
   'entity/player/wide/steve', 'entity/fishing/fishing_hook', 'entity/experience/experience_orb',
-  'entity/piglin/zombified_piglin', 'entity/end_crystal/end_crystal_beam',
+  'entity/piglin/zombified_piglin', 'entity/end_crystal/end_crystal_beam', 'entity/villager/type/plains',
+  'entity/villager/profession/farmer', 'entity/villager/profession/librarian', 'entity/villager/profession/cleric',
+  'entity/villager/profession/weaponsmith', 'entity/villager/profession/butcher',
 ];
 
 /** Non-tile files used by the HUD, screens, mobs and sky. */
@@ -412,6 +414,9 @@ export const EXTRA_FILES: string[] = [
   'gui/sprites/widget/button', 'gui/sprites/widget/button_highlighted', 'gui/sprites/widget/button_disabled',
   'gui/menu_background', 'font/ascii',
   // Sky and weather
-  'environment/celestial/sun', 'environment/celestial/moon/full_moon', 'environment/clouds', 'environment/rain',
+  'environment/celestial/sun', 'environment/celestial/moon/full_moon', 'environment/celestial/moon/waning_gibbous',
+  'environment/celestial/moon/third_quarter', 'environment/celestial/moon/waning_crescent',
+  'environment/celestial/moon/new_moon', 'environment/celestial/moon/waxing_crescent',
+  'environment/celestial/moon/first_quarter', 'environment/celestial/moon/waxing_gibbous', 'environment/clouds', 'environment/rain',
   'environment/snow', 'environment/end_sky', 'misc/underwater', 'misc/vignette', 'misc/enchanted_glint_item',
 ];

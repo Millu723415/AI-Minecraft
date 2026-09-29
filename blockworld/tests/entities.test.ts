@@ -103,3 +103,28 @@ describe('serialisation', () => {
     if (u.kind === 'chest') expect(u.items.get(5)).toMatchObject({ id: ItemId.DIAMOND, count: 3 });
   });
 });
+
+describe('creative flight', () => {
+  it('double-tapping jump toggles flight, landing ends it', () => {
+    const { p, ctx } = freshPlayer();
+    p.creative = true;
+    const press = (jump: boolean) => { p.input.jump = jump; p.tick(ctx); };
+    for (let i = 0; i < 5; i++) press(false);
+    expect(p.onGround).toBe(true);
+    press(true); press(false); press(true);
+    expect(p.flying).toBe(true);
+    // Hovering: no gravity while flying.
+    for (let i = 0; i < 5; i++) press(false);
+    const y = p.y;
+    for (let i = 0; i < 10; i++) press(false);
+    expect(Math.abs(p.y - y)).toBeLessThan(0.01);
+    // Survival players cannot toggle it.
+    const s = freshPlayer();
+    s.p.input.jump = true; s.p.tick(s.ctx); s.p.input.jump = false; s.p.tick(s.ctx); s.p.input.jump = true; s.p.tick(s.ctx);
+    expect(s.p.flying).toBe(false);
+    // Descending onto the ground lands.
+    p.input.sneak = true;
+    for (let i = 0; i < 40 && p.flying; i++) p.tick(ctx);
+    expect(p.flying).toBe(false);
+  });
+});

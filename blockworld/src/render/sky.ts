@@ -4,6 +4,7 @@
  */
 
 import * as THREE from 'three';
+import { packActive, packCanvas } from './pack';
 import { Random } from '../core/rng';
 import { Dim, type DimId } from '../world/constants';
 
@@ -12,6 +13,15 @@ export interface SkyState {
   fogColor: THREE.Color;
   skyColor: THREE.Color;
   celestialAngle: number;
+}
+
+/** Resource-pack moon phases, in the order they occur from full moon. */
+const MOON_PHASES = ['full_moon', 'waning_gibbous', 'third_quarter', 'waning_crescent', 'new_moon', 'waxing_crescent', 'first_quarter', 'waxing_gibbous'];
+
+/** Pack texture for a sky element, or null without a pack. */
+function packSky(path: string): THREE.Texture | null {
+  const c = packActive() ? packCanvas(path) : null;
+  return c ? canvasTexture(c) : null;
 }
 
 /** Classic celestial angle curve for a world time (0 = sunrise). */
@@ -38,6 +48,10 @@ function pixelTexture(size: number, paint: (ctx: CanvasRenderingContext2D) => vo
   canvas.height = size;
   const ctx = canvas.getContext('2d')!;
   paint(ctx);
+  return canvasTexture(canvas);
+}
+
+function canvasTexture(canvas: HTMLCanvasElement): THREE.Texture {
   const tex = new THREE.CanvasTexture(canvas);
   tex.magFilter = THREE.NearestFilter;
   tex.minFilter = THREE.NearestFilter;
@@ -47,7 +61,10 @@ function pixelTexture(size: number, paint: (ctx: CanvasRenderingContext2D) => vo
 }
 
 export class SkyRenderer {
+  /** Near sky (clouds): drawn with the world so terrain can hide it. */
   readonly group = new THREE.Group();
+  /** Far sky (sun, moon, stars, End sky): drawn first, beyond the world's far plane. */
+  readonly farGroup = new THREE.Group();
   private readonly celestial = new THREE.Group();
   private readonly sun: THREE.Mesh;
   private readonly moon: THREE.Mesh;
@@ -56,6 +73,11 @@ export class SkyRenderer {
   private readonly cloudTex: THREE.Texture;
   private readonly endSky: THREE.Mesh;
   private readonly sunGlow: THREE.Mesh;
+  /** Pack moon phase textures (one per phase) when a pack provides them. */
+  private readonly moonPhases: (THREE.Texture | null)[] = [];
+  private moonPhase = -1;
+  /** World blocks covered by one repeat of the cloud texture. */
+  private readonly cloudPeriod: number;
   cloudsEnabled = true;
 
   constructor() {
@@ -77,10 +99,14 @@ export class SkyRenderer {
       ctx.fillRect(6, 10, 2, 1);
     });
     const mat = (t: THREE.Texture) => new THREE.MeshBasicMaterial({ map: t, transparent: true, depthWrite: false, fog: false, blending: THREE.AdditiveBlending });
-    this.sun = new THREE.Mesh(new THREE.PlaneGeometry(60, 60), mat(sunTex));
+    // Pack sun and moon textures include their glow, so they are drawn larger.
+    const packSun = packSky('environment/celestial/sun');
+    for (const phase of MOON_PHASES) this.moonPhases.push(packSky(`environment/celestial/moon/${phase}`));
+    const packMoon = this.moonPhases[0];
+    this.sun = new THREE.Mesh(new THREE.PlaneGeometry(packSun ? 180 : 60, packSun ? 180 : 60), mat(packSun ?? sunTex));
     this.sun.position.set(0, 300, 0);
     this.sun.rotation.x = Math.PI / 2;
-    this.moon = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), mat(moonTex));
+    this.moon = new THREE.Mesh(new THREE.PlaneGeometry(packMoon ? 120 : 40, packMoon ? 120 : 40), mat(packMoon ?? moonTex));
     this.moon.position.set(0, -300, 0);
     this.moon.rotation.x = -Math.PI / 2;
     this.celestial.add(this.sun, this.moon);
@@ -101,11 +127,14 @@ export class SkyRenderer {
 
     const glowMat = new THREE.MeshBasicMaterial({ color: 0xff9040, transparent: true, opacity: 0, depthWrite: false, fog: false, side: THREE.DoubleSide });
     this.sunGlow = new THREE.Mesh(new THREE.CircleGeometry(160, 16), glowMat);
-    this.group.add(this.sunGlow);
-    this.group.add(this.celestial);
+    this.farGroup.add(this.sunGlow);
+    this.farGroup.add(this.celestial);
 
-    // Cloud layer: a thresholded noise map scrolled across a large plane.
-    this.cloudTex = pixelTexture(64, (ctx) => {
+    // Cloud layer: a thresholded noise map scrolled across a large plane
+    // (a pack's cloud map uses 12-block cells).
+    const packClouds = packSky('environment/clouds');
+    this.cloudPeriod = packClouds ? 256 * 12 : 128;
+    this.cloudTex = packClouds ?? pixelTexture(64, (ctx) => {
       const rr = new Random(4242);
       const cells = new Uint8Array(64 * 64);
       for (let i = 0; i < 64 * 64; i++) cells[i] = rr.next() < 0.45 ? 1 : 0;
@@ -125,7 +154,7 @@ export class SkyRenderer {
     });
     this.cloudTex.wrapS = THREE.RepeatWrapping;
     this.cloudTex.wrapT = THREE.RepeatWrapping;
-    this.cloudTex.repeat.set(6, 6);
+    this.cloudTex.repeat.set(768 / this.cloudPeriod, 768 / this.cloudPeriod);
     const cloudMat = new THREE.MeshBasicMaterial({ map: this.cloudTex, transparent: true, opacity: 0.8, depthWrite: false, side: THREE.DoubleSide, fog: true });
     this.clouds = new THREE.Mesh(new THREE.PlaneGeometry(768, 768), cloudMat);
     this.clouds.rotation.x = -Math.PI / 2;
@@ -133,7 +162,8 @@ export class SkyRenderer {
     this.group.add(this.clouds);
 
     // The End has a dark, speckled sky box.
-    const endTex = pixelTexture(32, (ctx) => {
+    const packEnd = packSky('environment/end_sky');
+    const endTex = packEnd ?? pixelTexture(32, (ctx) => {
       ctx.fillStyle = '#140c1c';
       ctx.fillRect(0, 0, 32, 32);
       const rr = new Random(99);
@@ -144,14 +174,17 @@ export class SkyRenderer {
     });
     endTex.wrapS = THREE.RepeatWrapping;
     endTex.wrapT = THREE.RepeatWrapping;
-    endTex.repeat.set(8, 8);
-    this.endSky = new THREE.Mesh(new THREE.BoxGeometry(600, 600, 600), new THREE.MeshBasicMaterial({ map: endTex, side: THREE.BackSide, fog: false, depthWrite: false }));
+    endTex.repeat.set(packEnd ? 16 : 8, packEnd ? 16 : 8);
+    this.endSky = new THREE.Mesh(new THREE.BoxGeometry(600, 600, 600), new THREE.MeshBasicMaterial({
+      map: endTex, side: THREE.BackSide, fog: false, depthWrite: false, color: packEnd ? 0x282828 : 0xffffff,
+    }));
     this.endSky.visible = false;
-    this.group.add(this.endSky);
+    this.farGroup.add(this.endSky);
   }
 
   update(time: number, dim: DimId, camPos: THREE.Vector3, rain: number, renderDistance: number, dt: number): SkyState {
     this.group.position.copy(camPos);
+    this.farGroup.position.copy(camPos);
     const angle = celestialAngle(time);
     if (dim === Dim.NETHER) {
       this.setVisible(false, false);
@@ -170,6 +203,13 @@ export class SkyRenderer {
     // Rotate around the east-west axis: the sun rises in the east.
     this.celestial.rotation.order = 'YXZ';
     this.celestial.rotation.y = -Math.PI / 2;
+    const phase = Math.floor(time / 24000) % 8;
+    if (phase !== this.moonPhase && this.moonPhases[phase]) {
+      this.moonPhase = phase;
+      const mm = this.moon.material as THREE.MeshBasicMaterial;
+      mm.map = this.moonPhases[phase];
+      mm.needsUpdate = true;
+    }
     const starOpacity = Math.max(0, 1 - daylight * 2.2) * (1 - rain);
     (this.stars.material as THREE.PointsMaterial).opacity = starOpacity;
     this.stars.visible = starOpacity > 0.01;
@@ -197,8 +237,8 @@ export class SkyRenderer {
     if (this.clouds.visible) {
       const cloudY = 108;
       this.clouds.position.set(0, cloudY - camPos.y, 0);
-      const drift = (time * 0.03) / 768;
-      this.cloudTex.offset.set((camPos.x / 768) * 6 + drift * 6, (-camPos.z / 768) * 6);
+      const period = this.cloudPeriod;
+      this.cloudTex.offset.set((camPos.x + time * 0.03) / period, -camPos.z / period);
       const cm = this.clouds.material as THREE.MeshBasicMaterial;
       cm.color.setScalar(Math.max(0.15, daylight * 0.95 + 0.05));
       cm.opacity = 0.8 * (1 - rain * 0.3);

@@ -5,6 +5,8 @@ first full release era of block-survival games (late 2011). It is written in
 TypeScript with Three.js and Vite. Every texture, sprite, model skin, sound,
 the pixel font, the logo and the ending text are original and generated
 procedurally at startup; the project ships no third-party game assets.
+Optionally you can import a resource pack you own on your machine (see
+[RESOURCE PACK](#resource-pack-optional)); it is never committed or bundled.
 
 You can play from punching the first tree to defeating the dragon and seeing
 the ending, then keep playing in the same world:
@@ -60,6 +62,25 @@ Seeds: an empty seed picks a random one, a number is used directly and any
 other text is hashed deterministically. The same seed always produces the same
 terrain and structures for this generator version.
 
+## RESOURCE PACK (OPTIONAL)
+
+The game runs with its own original art. If you have a resource pack zip in
+the standard `assets/minecraft/textures/...` layout, you can import it
+locally:
+
+```bash
+npm run import-pack -- /path/to/pack.zip
+```
+
+The script copies only the textures used by blocks, items, mobs, the HUD,
+container screens, the sky and weather that already exist in this game into
+`public/pack/` and writes `public/pack/manifest.json` (the folder is
+git-ignored). Restart `npm run dev` (or rebuild) and reload the page; the
+console prints `Resource pack: N textures`. Mob models switch to the pack's
+box layouts automatically. Anything the pack lacks keeps the built-in
+texture. Delete `public/pack/` to go back to the original art. The main menu
+keeps the BLOCKWORLD logo.
+
 ---
 
 ## CONTROLS
@@ -81,6 +102,7 @@ terrain and structures for this generator version.
 | Screenshot (PNG download) | **F2** |
 | Debug overlay (FPS, chunks, draw calls, position) | **F3** |
 | Third-person view | **F5** |
+| Creative inventory (creative mode) | **E** |
 
 All bindings can be changed in **Options → Controls**.
 
@@ -111,6 +133,11 @@ stack.
 * **Redstone**: dust, torches, repeaters, levers, buttons, pressure plates,
   pistons (sticky and normal), doors, trapdoors, note blocks, TNT, powered and
   detector rails.
+* **Weather**: rain comes and goes, darkening the sky; cold biomes get
+  snowfall (snow layers and ice form) and deserts stay dry.
+* **Creative mode**: instant mining, no hunger or damage, flying
+  (double-tap **Space**; Space/Shift to rise/descend, landing ends flight)
+  and a paged palette of every block and item on **E**.
 
 ## SAVE LOCATION / BEHAVIOR
 
@@ -155,8 +182,10 @@ Browser checks (require the dev server, or set `GAME_URL`, and Playwright's
 Chromium):
 
 ```bash
+node scripts/earlygame.mjs <outDir> [seed]     # trees -> tools -> stone -> furnace -> food
 node scripts/playthrough.mjs <outDir> [seed]   # end-to-end progression run
 node scripts/play.mjs <outPrefix> [seed] '[{"eval":"...","wait":1000,"shot":true}]'
+npx vite-node scripts/bench.ts                 # CPU timings for generation, lighting, meshing
 ```
 
 `playthrough.mjs` drives the real input and interaction code: it lights a
