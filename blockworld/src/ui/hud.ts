@@ -6,6 +6,7 @@ import type { Player } from '../entity/player';
 import { el } from './dom';
 import { hudIcons } from './hudicons';
 import { ItemView } from './itemview';
+import { fireCanvas } from '../render/firetex';
 
 export interface BossInfo { name: string; health: number; maxHealth: number }
 
@@ -54,6 +55,7 @@ export class HUD {
   readonly hurt: HTMLDivElement;
   readonly portal: HTMLDivElement;
   readonly sleep: HTMLDivElement;
+  private burn: HTMLDivElement;
   private lastHealth = 20;
   private flashTicks = 0;
   private tick = 0;
@@ -66,6 +68,8 @@ export class HUD {
     this.hurt = el('div', 'hurt-flash', this.root);
     this.portal = el('div', 'portal-overlay', this.root);
     this.sleep = el('div', 'sleep-overlay', this.root);
+    this.burn = el('div', 'burn-overlay', this.root);
+    this.burn.style.backgroundImage = `url(${fireCanvas().toDataURL()})`;
     this.crosshair = el('div', 'crosshair', this.root);
     this.hotbar = el('div', 'hotbar', this.root);
     for (let i = 0; i < 9; i++) {
@@ -133,6 +137,9 @@ export class HUD {
     this.tick++;
     const icons = hudIcons();
     const creative = p.creative;
+    const burning = p.fireTicks > 0 && !creative && !p.hasEffect(Effect.FIRE_RESISTANCE);
+    this.burn.style.display = burning ? '' : 'none';
+    if (burning) this.burn.style.backgroundPositionX = `${(this.tick >> 2) % 2 ? 0 : 50}%`;
     this.crosshair.style.display = showCrosshair ? '' : 'none';
     // Hotbar.
     for (let i = 0; i < 9; i++) this.hotbarViews[i].set(p.inventory.get(i));

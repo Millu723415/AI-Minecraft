@@ -5,6 +5,7 @@
  */
 
 import * as THREE from 'three';
+import { fireTexture } from './firetex';
 import type { Entity } from '../entity/entity';
 import { ItemEntity, XpOrb, FallingBlock, PrimedTnt } from '../entity/items';
 import { Arrow, Throwable, EyeOfEnderSignal, Fireball } from '../entity/projectiles';
@@ -21,6 +22,8 @@ export interface EntityVisual {
   object: THREE.Object3D;
   update(e: Entity, rc: RenderContext): void;
   dispose?(): void;
+  /** Burning overlay, managed by the renderer. */
+  fire?: THREE.Mesh;
 }
 
 export type ModelFactory = (e: Entity) => EntityVisual;
@@ -193,18 +196,17 @@ export class EntityRenderer {
   }
 
   private fireballVisual(small: boolean): EntityVisual {
-    const mat = new THREE.MeshBasicMaterial({ color: small ? 0xff8020 : 0xff5010 });
-    const m = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), mat);
-    const inner = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.6, 0.6), new THREE.MeshBasicMaterial({ color: 0xffe060 }));
-    m.add(inner);
-    m.scale.setScalar(small ? 0.3 : 0.9);
+    const mat = new THREE.SpriteMaterial({ map: fireballTexture(), alphaTest: 0.5 });
+    const m = new THREE.Sprite(mat);
+    m.scale.setScalar(small ? 0.5 : 1.1);
     return {
       object: m,
       update: (ent, rc) => {
         const [x, y, z] = interpPos(ent, rc.alpha);
         m.position.set(x, y + ent.height / 2, z);
-        m.rotation.set(rc.time * 5, rc.time * 4, 0);
+        mat.rotation = Math.floor(rc.time * 8) * (Math.PI / 2);
       },
+      dispose: () => mat.dispose(),
     };
   }
 
@@ -226,19 +228,44 @@ export class EntityRenderer {
       }
       seen.add(e.id);
       v.update(e, rc);
+      this.updateFire(e, v, dx, dz);
     }
     for (const [id, v] of this.visuals) {
       if (!seen.has(id)) {
         this.group.remove(v.object);
+        if (v.fire) this.group.remove(v.fire);
         v.dispose?.();
         this.visuals.delete(id);
       }
     }
   }
 
+  /** Burning entities get a camera-facing sheet of fire around their box. */
+  private updateFire(e: Entity, v: EntityVisual, dx: number, dz: number): void {
+    const burning = e.fireTicks > 0 && !e.fireImmune;
+    let f = v.fire;
+    if (!burning) {
+      if (f) f.visible = false;
+      return;
+    }
+    if (!f) {
+      if (!fireMaterial) fireMaterial = new THREE.MeshBasicMaterial({ map: fireTexture(), alphaTest: 0.5, side: THREE.DoubleSide });
+      f = new THREE.Mesh(fireGeometry(), fireMaterial);
+      v.fire = f;
+      this.group.add(f);
+    }
+    f.visible = true;
+    const vo = v.object.position;
+    f.position.set(vo.x, e.y, vo.z);
+    const w = Math.max(0.6, e.width * 1.4);
+    f.scale.set(w, e.height * 1.2, w);
+    f.rotation.y = Math.atan2(-dx, -dz);
+  }
+
   clear(): void {
     for (const v of this.visuals.values()) {
       this.group.remove(v.object);
+      if (v.fire) this.group.remove(v.fire);
       v.dispose?.();
     }
     this.visuals.clear();
@@ -247,4 +274,52 @@ export class EntityRenderer {
   get count(): number {
     return this.visuals.size;
   }
+}
+
+let fireMaterial: THREE.MeshBasicMaterial | null = null;
+let fireGeo: THREE.BufferGeometry | null = null;
+
+/** Two stacked fire quads (unit width/height, feet at y=0), slightly in front of the entity. */
+function fireGeometry(): THREE.BufferGeometry {
+  if (fireGeo) return fireGeo;
+  const a = new THREE.PlaneGeometry(1, 0.6);
+  a.translate(0, 0.3, 0.3);
+  const b = new THREE.PlaneGeometry(0.8, 0.5);
+  b.translate(0, 0.75, 0.25);
+  const g = new THREE.BufferGeometry();
+  const pa = a.getAttribute('position').array; const pb = b.getAttribute('position').array;
+  const ua = a.getAttribute('uv').array; const ub = b.getAttribute('uv').array;
+  g.setAttribute('position', new THREE.Float32BufferAttribute([...pa, ...pb], 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute([...ua, ...ub], 2));
+  const ia = Array.from(a.getIndex()!.array); const ib = Array.from(b.getIndex()!.array).map((i) => i + 4);
+  g.setIndex([...ia, ...ib]);
+  fireGeo = g;
+  return g;
+}
+
+let fireballTex: THREE.Texture | null = null;
+
+/** Original 16x16 pixel fireball: a ragged hot core with a darker rim. */
+function fireballTexture(): THREE.Texture {
+  if (fireballTex) return fireballTex;
+  const c = document.createElement('canvas');
+  c.width = 16; c.height = 16;
+  const g = c.getContext('2d')!;
+  let seed = 1234567;
+  const rnd = (): number => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+  for (let y = 0; y < 16; y++) {
+    for (let x = 0; x < 16; x++) {
+      const d = Math.hypot(x - 7.5, y - 7.5) + (rnd() - 0.5) * 1.6;
+      if (d > 7.2) continue;
+      const col = d < 2.5 ? [255, 250, 190] : d < 4.2 ? [255, 214, 70] : d < 5.8 ? [245, 130, 30] : [150, 40, 20];
+      g.fillStyle = `rgb(${col[0]},${col[1]},${col[2]})`;
+      g.fillRect(x, y, 1, 1);
+    }
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.magFilter = THREE.NearestFilter;
+  t.minFilter = THREE.NearestFilter;
+  t.colorSpace = THREE.SRGBColorSpace;
+  fireballTex = t;
+  return t;
 }

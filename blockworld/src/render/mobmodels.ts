@@ -64,7 +64,7 @@ function eyes(s: SkinCanvas, fx: number, fy: number, w: number, eyeY: number, wh
 const PINK: RGB = [240, 160, 160];
 
 function pigSkin(): SkinCanvas {
-  const s = new SkinCanvas(64, 32, 'pig');
+  const s = new SkinCanvas(64, 64, 'pig');
   s.box(0, 0, 8, 8, 8, PINK, 8);
   const [fx, fy] = s.front(0, 0, 8, 8, 8);
   s.rect(fx + 1, fy + 3, 2, 1, [255, 255, 255]); s.px(fx + 1, fy + 3, [20, 20, 20]);
@@ -72,14 +72,14 @@ function pigSkin(): SkinCanvas {
   s.box(16, 16, 4, 3, 1, [230, 130, 140], 6); // snout
   const [sx, sy] = s.front(16, 16, 4, 3, 1);
   s.px(sx + 1, sy + 1, [120, 50, 60]); s.px(sx + 2, sy + 1, [120, 50, 60]);
-  s.box(28, 8, 10, 8, 16, PINK, 8); // body
+  s.box(0, 32, 10, 8, 16, PINK, 8); // body
   s.box(0, 16, 4, 6, 4, [220, 140, 140], 8); // leg
   s.rect(0, 16 + 4 + 5, 16, 1, [120, 80, 70]);
   return s;
 }
 
 function cowSkin(red: boolean): SkinCanvas {
-  const s = new SkinCanvas(64, 32, red ? 'mooshroom' : 'cow');
+  const s = new SkinCanvas(64, 64, red ? 'mooshroom' : 'cow');
   const base: RGB = red ? [168, 30, 30] : [70, 52, 40];
   const patch: RGB = red ? [230, 220, 210] : [235, 235, 230];
   s.box(0, 0, 8, 8, 6, base, 10);
@@ -89,9 +89,9 @@ function cowSkin(red: boolean): SkinCanvas {
   s.rect(fx + 2, fy + 6, 4, 2, [220, 190, 170]);
   s.px(fx + 2, fy + 7, [60, 40, 40]); s.px(fx + 5, fy + 7, [60, 40, 40]);
   s.box(22, 0, 1, 3, 1, [220, 220, 200], 6); // horn
-  s.box(18, 4, 12, 18, 10, base, 10); // body
-  for (let i = 0; i < 7; i++) {
-    const x = 18 + s.rng.int(40); const y = 4 + s.rng.int(24);
+  s.box(0, 32, 12, 10, 18, base, 10); // body
+  for (let i = 0; i < 9; i++) {
+    const x = s.rng.int(56); const y = 32 + s.rng.int(25);
     s.noise(x, y, 3 + s.rng.int(5), 2 + s.rng.int(4), patch, 6);
   }
   s.box(0, 16, 4, 12, 4, base, 10);
@@ -101,21 +101,21 @@ function cowSkin(red: boolean): SkinCanvas {
 }
 
 function sheepSkin(): SkinCanvas {
-  const s = new SkinCanvas(64, 32, 'sheep');
+  const s = new SkinCanvas(64, 64, 'sheep');
   s.box(0, 0, 6, 6, 8, [210, 190, 170], 8); // face
   const [fx, fy] = s.front(0, 0, 6, 6, 8);
   s.rect(fx + 1, fy + 2, 1, 1, [20, 20, 20]); s.rect(fx + 4, fy + 2, 1, 1, [20, 20, 20]);
   s.rect(fx + 2, fy + 4, 2, 1, [200, 150, 150]);
-  s.box(28, 8, 8, 16, 6, [200, 180, 160], 8);
+  s.box(0, 32, 8, 6, 16, [200, 180, 160], 8);
   s.box(0, 16, 4, 12, 4, [200, 180, 160], 8);
   s.rect(0, 16 + 4 + 11, 16, 1, [60, 50, 40]);
   return s;
 }
 
 function woolSkin(): SkinCanvas {
-  const s = new SkinCanvas(64, 32, 'wool');
+  const s = new SkinCanvas(64, 64, 'wool');
   s.box(0, 0, 6, 6, 6, [235, 235, 235], 14);
-  s.box(28, 8, 8, 16, 6, [235, 235, 235], 14);
+  s.box(0, 32, 8, 6, 16, [235, 235, 235], 14);
   s.box(0, 16, 4, 6, 4, [235, 235, 235], 14);
   return s;
 }
@@ -372,16 +372,16 @@ function crystalSkin(): SkinCanvas {
 }
 
 function boatSkin(): SkinCanvas {
-  const s = new SkinCanvas(64, 32, 'boat');
-  s.noise(0, 0, 64, 32, [150, 118, 72], 10);
-  for (let y = 0; y < 32; y += 4) s.rect(0, y + 3, 64, 1, [110, 84, 50]);
+  const s = new SkinCanvas(128, 64, 'boat');
+  s.noise(0, 0, 128, 64, [150, 118, 72], 10);
+  for (let y = 0; y < 64; y += 4) s.rect(0, y + 3, 128, 1, [110, 84, 50]);
   return s;
 }
 
 function minecartSkin(): SkinCanvas {
-  const s = new SkinCanvas(64, 32, 'minecart');
-  s.noise(0, 0, 64, 32, [120, 120, 124], 10);
-  for (let y = 0; y < 32; y += 8) s.rect(0, y, 64, 1, [80, 80, 84]);
+  const s = new SkinCanvas(128, 64, 'minecart');
+  s.noise(0, 0, 128, 64, [120, 120, 124], 10);
+  for (let y = 0; y < 64; y += 8) s.rect(0, y, 128, 1, [80, 80, 84]);
   return s;
 }
 
@@ -456,11 +456,11 @@ const HUMAN_UV = { head: [0, 0] as [number, number], body: [16, 16] as [number, 
 // ---------------------------------------------------------------------------
 // Model definitions
 // ---------------------------------------------------------------------------
-const DEFS: Record<string, (e: Entity) => ModelDef> = {
+export const MODEL_DEFS: Record<string, (e: Entity) => ModelDef> = {
   pig: () => ({
-    texW: 64, texH: 32, skin: pigSkin,
+    texW: 64, texH: 64, skin: pigSkin,
     parts: [
-      { name: 'body', pivot: [0, 0, 0], boxes: [B(-5, 6, -8, 10, 8, 16, 28, 8)] },
+      { name: 'body', pivot: [0, 0, 0], boxes: [B(-5, 6, -8, 10, 8, 16, 0, 32)] },
       { name: 'head', pivot: [0, 12, -7], boxes: [B(-4, -4, -8, 8, 8, 8, 0, 0), B(-2, -4, -9, 4, 3, 1, 16, 16)] },
       { name: 'leg0', pivot: [3, 6, -5], boxes: [B(-2, -6, -2, 4, 6, 4, 0, 16)] },
       { name: 'leg1', pivot: [-3, 6, -5], boxes: [B(-2, -6, -2, 4, 6, 4, 0, 16)] },
@@ -472,9 +472,9 @@ const DEFS: Record<string, (e: Entity) => ModelDef> = {
   cow: () => cowDef(false),
   mooshroom: () => cowDef(true),
   sheep: (e) => ({
-    texW: 64, texH: 32, skin: sheepSkin,
+    texW: 64, texH: 64, skin: sheepSkin,
     parts: [
-      { name: 'body', pivot: [0, 0, 0], boxes: [B(-4, 12, -8, 8, 6, 16, 28, 8)] },
+      { name: 'body', pivot: [0, 0, 0], boxes: [B(-4, 12, -8, 8, 6, 16, 0, 32)] },
       { name: 'head', pivot: [0, 18, -8], boxes: [B(-3, -4, -6, 6, 6, 8, 0, 0)] },
       { name: 'leg0', pivot: [3, 12, -5], boxes: [B(-2, -12, -2, 4, 12, 4, 0, 16)] },
       { name: 'leg1', pivot: [-3, 12, -5], boxes: [B(-2, -12, -2, 4, 12, 4, 0, 16)] },
@@ -713,7 +713,7 @@ const DEFS: Record<string, (e: Entity) => ModelDef> = {
     },
   }),
   boat: () => ({
-    texW: 64, texH: 32, skin: boatSkin,
+    texW: 128, texH: 64, skin: boatSkin,
     parts: [{
       name: 'hull', pivot: [0, 0, 0], boxes: [
         B(-12, 0, -8, 24, 2, 16, 0, 8), B(-12, 2, -9, 24, 6, 2, 0, 0), B(-12, 2, 7, 24, 6, 2, 0, 0),
@@ -726,7 +726,7 @@ const DEFS: Record<string, (e: Entity) => ModelDef> = {
     },
   }),
   minecart: () => ({
-    texW: 64, texH: 32, skin: minecartSkin,
+    texW: 128, texH: 64, skin: minecartSkin,
     parts: [{
       name: 'cart', pivot: [0, 2, 0], boxes: [
         B(-8, 0, -10, 16, 2, 20, 0, 10), B(-8, 2, -10, 16, 8, 2, 0, 0), B(-8, 2, 8, 16, 8, 2, 0, 0),
@@ -760,9 +760,9 @@ const DEFS: Record<string, (e: Entity) => ModelDef> = {
 
 function cowDef(red: boolean): ModelDef {
   return {
-    texW: 64, texH: 32, skin: () => cowSkin(red),
+    texW: 64, texH: 64, skin: () => cowSkin(red),
     parts: [
-      { name: 'body', pivot: [0, 0, 0], boxes: [B(-6, 10, -8, 12, 10, 18, 18, 4)] },
+      { name: 'body', pivot: [0, 0, 0], boxes: [B(-6, 10, -8, 12, 10, 18, 0, 32)] },
       { name: 'head', pivot: [0, 20, -8], boxes: [B(-4, -4, -6, 8, 8, 6, 0, 0), B(-5, 3, -4, 1, 3, 1, 22, 0), B(4, 3, -4, 1, 3, 1, 22, 0)] },
       { name: 'leg0', pivot: [4, 12, -6], boxes: [B(-2, -12, -2, 4, 12, 4, 0, 16)] },
       { name: 'leg1', pivot: [-4, 12, -6], boxes: [B(-2, -12, -2, 4, 12, 4, 0, 16)] },
@@ -798,8 +798,9 @@ function spiderDef(cave: boolean): ModelDef {
         const swingY = -Math.cos(t.limbSwing * 0.6662 * 2 + phase) * 0.4 * t.limbAmount;
         const swingZ = Math.abs(Math.sin(t.limbSwing * 0.6662 + phase)) * 0.4 * t.limbAmount;
         const g = p[`leg${i}`].group;
-        g.rotation.set(0, side * (baseY + swingY), side * (-0.58 + swingZ) * -1);
-        g.rotation.z = side > 0 ? 0.58 - swingZ : -0.58 + swingZ;
+        const tilt = [0.785, 0.58, 0.58, 0.785][pair] - swingZ;
+        // Y is up: a negative Z rotation lowers the tip of a +X leg.
+        g.rotation.set(0, side * (baseY + swingY), -side * tilt);
       }
     },
   };
@@ -840,8 +841,6 @@ function mushroomsOnBack(p: PartMap): void {
 }
 
 function addWool(p: PartMap, e: Entity): void {
-  const tex = new SkinCanvas(64, 32, 'woolx');
-  void tex;
   const woolTex = (() => {
     const key = 'wool';
     let t = skinCache.get(key);
@@ -849,14 +848,14 @@ function addWool(p: PartMap, e: Entity): void {
     return t;
   })();
   const mat = new THREE.MeshBasicMaterial({ map: woolTex });
-  const body = new Part([B(-4, 12, -8, 8, 6, 16, 28, 8, { inflate: 1.75 })], mat, 64, 32, [0, 0, 0]);
-  const head = new Part([B(-3, -4, -4, 6, 6, 6, 0, 0, { inflate: 0.6 })], mat, 64, 32, [0, 0, 0]);
+  const body = new Part([B(-4, 12, -8, 8, 6, 16, 0, 32, { inflate: 1.75 })], mat, 64, 64, [0, 0, 0]);
+  const head = new Part([B(-3, -4, -4, 6, 6, 6, 0, 0, { inflate: 0.6 })], mat, 64, 64, [0, 0, 0]);
   body.group.userData.wool = true;
   head.group.userData.wool = true;
   p.body.group.add(body.group);
   p.head.group.add(head.group);
   const legs = ['leg0', 'leg1', 'leg2', 'leg3'].map((n) => {
-    const l = new Part([B(-2, -6, -2, 4, 6, 4, 0, 16, { inflate: 0.5 })], mat, 64, 32, [0, 0, 0]);
+    const l = new Part([B(-2, -6, -2, 4, 6, 4, 0, 16, { inflate: 0.5 })], mat, 64, 64, [0, 0, 0]);
     l.group.userData.wool = true;
     p[n].group.add(l.group);
     return l;
@@ -923,7 +922,7 @@ class MobModel implements EntityVisual {
     const key = this.computeSkinKey(e);
     if (key !== this.skinKey) {
       this.skinKey = key;
-      this.def = DEFS[this.type](e);
+      this.def = MODEL_DEFS[this.type](e);
       this.material.map = textureFor(key, this.def);
       this.material.needsUpdate = true;
     }
@@ -1019,8 +1018,8 @@ function normalizeAngle(a: number): number {
 
 /** Register all mob model factories with the entity renderer. */
 export function registerMobModels(): void {
-  for (const type of Object.keys(DEFS)) {
-    MODEL_FACTORIES.set(type, (e) => new MobModel(type, DEFS[type](e), e));
+  for (const type of Object.keys(MODEL_DEFS)) {
+    MODEL_FACTORIES.set(type, (e) => new MobModel(type, MODEL_DEFS[type](e), e));
   }
   MODEL_FACTORIES.set('ender_dragon', (e) => new DragonModel(e));
   MODEL_FACTORIES.set('fishing_hook', (e) => new BobberModel(e));

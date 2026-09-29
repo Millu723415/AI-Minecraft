@@ -324,6 +324,11 @@ html, body {
 .hurt-flash { position: absolute; inset: 0; background: rgba(160, 0, 0, 0.25); opacity: 0; transition: opacity 0.2s; }
 .portal-overlay { position: absolute; inset: 0; background: rgba(120, 30, 200, 0.45); opacity: 0; }
 .sleep-overlay { position: absolute; inset: 0; background: #000; opacity: 0; }
+.burn-overlay {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 45%;
+  background-repeat: repeat-x; background-size: auto 100%;
+  image-rendering: pixelated; opacity: 0.85; pointer-events: none;
+}
 
 /* ---- Menus -------------------------------------------------------------- */
 .logo { margin-top: 30px; image-rendering: pixelated; }
