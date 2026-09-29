@@ -501,7 +501,7 @@ export class Interaction {
     p.inventory.changed();
   }
 
-  private playNote(dim: Dimension, x: number, y: number, z: number): void {
+  playNote(dim: Dimension, x: number, y: number, z: number): void {
     if (dim.getBlock(x, y + 1, z) !== 0) return;
     const tile = dim.getOrCreateTile('note', x, y, z);
     const pitch = tile.kind === 'note' ? tile.pitch : 0;

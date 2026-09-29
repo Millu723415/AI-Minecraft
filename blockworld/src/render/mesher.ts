@@ -8,6 +8,7 @@
  *   so each can use the right material and blending.
  */
 
+import { HDIRS, wireColor, wireShape } from '../world/redstonelogic';
 import { BlockId } from '../blocks/ids';
 import { getBlock, SOLID, IS_FLUID } from '../blocks/registry';
 import type { BlockDefinition } from '../blocks/types';
@@ -255,6 +256,8 @@ export class ChunkMesher {
   private leafTiles: number[];
   private grassSideTile: number;
   private grassSnowTile: number;
+  private dustDot: number;
+  private dustLine: number;
   private options: MesherOptions = { fancyLeaves: true, smoothLighting: true };
   faces = 0;
 
@@ -265,6 +268,8 @@ export class ChunkMesher {
     this.leafTiles = ['oak', 'spruce', 'birch'].map((k) => tileOf(`leaves_${k}`));
     this.grassSideTile = tileOf('grass_side');
     this.grassSnowTile = tileOf('grass_side_snow');
+    this.dustDot = tileOf('redstone_dust_dot');
+    this.dustLine = tileOf('redstone_dust_line');
   }
 
   setOptions(o: MesherOptions): void {
@@ -587,16 +592,59 @@ export class ChunkMesher {
   }
 
   private emitWire(id: number, meta: number, x: number, y: number, z: number, i: number): void {
-    const tile = this.faceTiles[(id << 4) * 6 + 2];
-    const [u0, v0, u1, v1] = tileUV(tile);
-    const l = pLight[i];
+    void id;
+    const shape = wireShape((dx, dy, dz) => pBlocks[i + dx * SX + dy * SY + dz * SZ], (dx, dy, dz) => pMeta[i + dx * SX + dy * SY + dz * SZ]);
     const power = meta & 15;
-    const r = 80 + power * 11;
-    const yy = y + 0.02;
-    const pts: [number, number, number, number][] = [[0, 1, u0, v1], [1, 1, u1, v1], [1, 0, u1, v0], [0, 0, u0, v0]];
-    for (const [px, pz, uu, vv] of pts) this.cutout.vertex(x + px, yy, z + pz, uu, vv, (l >> 4) * 17, Math.max(l & 15, power > 0 ? 5 : 0) * 17, 255, r, 30, 30);
-    this.cutout.quad(false);
-    this.faces++;
+    const [r, g, b] = wireColor(power);
+    const l = pLight[i];
+    const sky = (l >> 4) * 17;
+    const blk = Math.max(l & 15, power > 0 ? 6 : 0) * 17;
+    const yy = y + 1 / 64;
+    const quadXZ = (tile: number, x0: number, z0: number, x1: number, z1: number, alongX: boolean) => {
+      const [u0, v0, u1, v1] = tileUV(tile);
+      // Map the tile so its vertical axis runs along the dust line.
+      const tu = (fx: number, fz: number): [number, number] => {
+        const a = alongX ? fz : fx; const c = alongX ? fx : fz;
+        return [u0 + (u1 - u0) * a, v0 + (v1 - v0) * c];
+      };
+      const corners: [number, number][] = [[x0, z1], [x1, z1], [x1, z0], [x0, z0]];
+      for (const [cx, cz] of corners) {
+        const [uu, vv] = tu(cx - x, cz - z);
+        this.cutout.vertex(cx, yy, cz, uu, vv, sky, blk, 255, r, g, b);
+      }
+      this.cutout.quad(false);
+      this.faces++;
+    };
+    const m = shape.mask;
+    const xs = m & 0b0011; const zs = m & 0b1100;
+    if (m === 0 || (xs && !zs) || (zs && !xs)) {
+      if (m === 0) quadXZ(this.dustDot, x, z, x + 1, z + 1, false);
+      else quadXZ(this.dustLine, x, z, x + 1, z + 1, !!xs);
+    } else {
+      quadXZ(this.dustDot, x, z, x + 1, z + 1, false);
+      if (m & 1) quadXZ(this.dustLine, x + 0.5, z, x + 1, z + 1, true);
+      if (m & 2) quadXZ(this.dustLine, x, z, x + 0.5, z + 1, true);
+      if (m & 4) quadXZ(this.dustLine, x, z + 0.5, x + 1, z + 1, false);
+      if (m & 8) quadXZ(this.dustLine, x, z, x + 1, z + 0.5, false);
+    }
+    // Dust climbing the side of the neighbouring block.
+    if (shape.up) {
+      const [u0, v0, u1, v1] = tileUV(this.dustLine);
+      for (let k = 0; k < 4; k++) {
+        if (!(shape.up & (1 << k))) continue;
+        const [dx, dz] = HDIRS[k];
+        const eps = 1 / 64;
+        const fx = dx > 0 ? x + 1 - eps : dx < 0 ? x + eps : 0;
+        const fz = dz > 0 ? z + 1 - eps : dz < 0 ? z + eps : 0;
+        const pts: [number, number, number][] = dx !== 0
+          ? [[fx, y, z], [fx, y, z + 1], [fx, y + 1, z + 1], [fx, y + 1, z]]
+          : [[x, y, fz], [x + 1, y, fz], [x + 1, y + 1, fz], [x, y + 1, fz]];
+        const uvs: [number, number][] = [[u0, v1], [u1, v1], [u1, v0], [u0, v0]];
+        for (let c = 0; c < 4; c++) this.cutout.vertex(pts[c][0], pts[c][1], pts[c][2], uvs[c][0], uvs[c][1], sky, blk, 230, r, g, b);
+        this.cutout.quad(false);
+        this.faces++;
+      }
+    }
   }
 
   private emitRail(def: BlockDefinition, id: number, meta: number, x: number, y: number, z: number, i: number): void {

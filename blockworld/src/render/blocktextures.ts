@@ -718,6 +718,32 @@ paint('redstone_dust', (t) => {
   }
   t.rect(6, 6, 4, 4, [230, 40, 40]);
 });
+// Dust pieces are painted light grey and tinted by power in the mesher.
+paint('redstone_dust_dot', (t) => {
+  t.clear();
+  for (let y = 0; y < 16; y++) {
+    for (let x = 0; x < 16; x++) {
+      const d = Math.hypot(x - 7.5, y - 7.5);
+      if (d > 4.2 + t.rng.next() * 0.8) continue;
+      const v = 200 + t.rng.int(56);
+      t.set(x, y, [v, v, v]);
+    }
+  }
+});
+paint('redstone_dust_line', (t) => {
+  t.clear();
+  for (let y = 0; y < 16; y++) {
+    for (let x = 5; x <= 10; x++) {
+      if ((x === 5 || x === 10) && t.rng.next() < 0.5) continue;
+      const v = 200 + t.rng.int(56);
+      t.set(x, y, [v, v, v]);
+    }
+  }
+});
+paint('lever_handle', (t) => {
+  t.noise([118, 88, 50], 10);
+  for (let y = 0; y < 16; y += 4) t.rect(0, y, 16, 1, [96, 70, 40]);
+});
 paint('lever', (t) => {
   t.clear();
   t.rect(5, 11, 6, 4, [110, 110, 110]).rect(7, 3, 2, 9, [120, 90, 50]).rect(7, 3, 2, 1, [150, 110, 60]);

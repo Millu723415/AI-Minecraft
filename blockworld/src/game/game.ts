@@ -133,7 +133,9 @@ export class Game implements GameContext, InteractionHost, UIHost {
     this.behaviors = new BlockBehaviors(this);
     this.redstone = new Redstone(this);
     this.behaviors.redstone = this.redstone;
+    this.redstone.dropBlock = (d, x, y, z, id, meta) => this.behaviors.dropBlock(d, x, y, z, id, meta);
     this.interaction = new Interaction(this, input);
+    this.redstone.playNote = (d, x, y, z) => this.interaction.playNote(d, x, y, z);
     this.mobs = new MobSystem(this);
     this.entityRenderer = new EntityRenderer(renderer.blockItemMaterial, renderer.spriteItemMaterial);
     (window as unknown as { __itemMats: Record<string, unknown> }).__itemMats = { block: renderer.blockItemMaterial, sprite: renderer.spriteItemMaterial };

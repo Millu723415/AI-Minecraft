@@ -54,6 +54,7 @@ function T(): Record<string, number> {
       cakeInner: tileOf('cake_side'),
       water: tileOf('water'),
       cobble: tileOf('cobblestone'),
+      leverHandle: tileOf('lever_handle'),
       torch: tileOf('torch'),
       brewBase: tileOf('brewing_stand_base'),
       pistonTop: tileOf('piston_top'),
@@ -233,13 +234,15 @@ export function blockBoxes(id: number, meta: number, neighbor?: NeighborFn): Ren
       const on = (meta & 8) !== 0;
       const c = T().cobble;
       const ct = [c, c, c, c, c, c];
+      const h = T().leverHandle;
+      const ht = { tiles: [h, h, h, h, h, h] };
       const lean = on ? 3 * P : -3 * P;
       switch (meta & 7) {
-        case Attach.EAST: return [box(13 * P, 4 * P, 5 * P, 1, 12 * P, 11 * P, { tiles: ct }), box(9 * P, 7 * P + lean, 7 * P, 13 * P, 9 * P + lean, 9 * P)];
-        case Attach.WEST: return [box(0, 4 * P, 5 * P, 3 * P, 12 * P, 11 * P, { tiles: ct }), box(3 * P, 7 * P + lean, 7 * P, 7 * P, 9 * P + lean, 9 * P)];
-        case Attach.SOUTH: return [box(5 * P, 4 * P, 13 * P, 11 * P, 12 * P, 1, { tiles: ct }), box(7 * P, 7 * P + lean, 9 * P, 9 * P, 9 * P + lean, 13 * P)];
-        case Attach.NORTH: return [box(5 * P, 4 * P, 0, 11 * P, 12 * P, 3 * P, { tiles: ct }), box(7 * P, 7 * P + lean, 3 * P, 9 * P, 9 * P + lean, 7 * P)];
-        default: return [box(4 * P, 0, 5 * P, 12 * P, 3 * P, 11 * P, { tiles: ct }), box(7 * P + lean, 3 * P, 7 * P, 9 * P + lean, 10 * P, 9 * P)];
+        case Attach.EAST: return [box(13 * P, 4 * P, 5 * P, 1, 12 * P, 11 * P, { tiles: ct }), box(8 * P, 7 * P + lean, 7 * P, 13 * P, 9 * P + lean, 9 * P, ht)];
+        case Attach.WEST: return [box(0, 4 * P, 5 * P, 3 * P, 12 * P, 11 * P, { tiles: ct }), box(3 * P, 7 * P + lean, 7 * P, 8 * P, 9 * P + lean, 9 * P, ht)];
+        case Attach.SOUTH: return [box(5 * P, 4 * P, 13 * P, 11 * P, 12 * P, 1, { tiles: ct }), box(7 * P, 7 * P + lean, 8 * P, 9 * P, 9 * P + lean, 13 * P, ht)];
+        case Attach.NORTH: return [box(5 * P, 4 * P, 0, 11 * P, 12 * P, 3 * P, { tiles: ct }), box(7 * P, 7 * P + lean, 3 * P, 9 * P, 9 * P + lean, 8 * P, ht)];
+        default: return [box(4 * P, 0, 5 * P, 12 * P, 3 * P, 11 * P, { tiles: ct }), box(7 * P + lean, 3 * P, 7 * P, 9 * P + lean, 10 * P, 9 * P, ht)];
       }
     }
     case 'repeater': {

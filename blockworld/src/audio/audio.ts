@@ -91,6 +91,8 @@ const VOICES: Record<string, Voice> = {
   'random.orb': (c, o, t, p, v) => { tone(c, o, t, 0.25, 'sine', 1300 * p, 1320 * p, v * 0.2); tone(c, o, t + 0.02, 0.2, 'sine', 1950 * p, 1960 * p, v * 0.1); },
   'random.levelup': (c, o, t, p, v) => { [0, 0.12, 0.24, 0.4].forEach((d, i) => tone(c, o, t + d, 0.35, 'triangle', [523, 659, 784, 1046][i] * p, [523, 659, 784, 1046][i] * p, v * 0.25)); },
   'random.click': (c, o, t, p, v) => tone(c, o, t, 0.03, 'square', 1800 * p, 1200 * p, v * 0.12),
+  'tile.piston.out': (c, o, t, p, v) => { noise(c, o, t, 0.18, 'bandpass', 700 * p, 1.4, v * 0.45); tone(c, o, t, 0.12, 'square', 220 * p, 330 * p, v * 0.08); },
+  'tile.piston.in': (c, o, t, p, v) => { noise(c, o, t, 0.16, 'bandpass', 550 * p, 1.4, v * 0.4); tone(c, o, t, 0.1, 'square', 300 * p, 200 * p, v * 0.08); },
   'random.bow': (c, o, t, p, v) => noise(c, o, t, 0.25, 'bandpass', 900 * p, 1.2, v * 0.5, 0.01, 3000 * p),
   'arrow.hit': (c, o, t, p, v) => { noise(c, o, t, 0.08, 'bandpass', 800 * p, 2, v * 0.5); tone(c, o, t, 0.06, 'triangle', 300 * p, 150, v * 0.2); },
   'random.break': (c, o, t, p, v) => { noise(c, o, t, 0.2, 'highpass', 2000 * p, 1, v * 0.5); tone(c, o, t, 0.15, 'square', 400 * p, 100, v * 0.08); },
