@@ -10,7 +10,11 @@ import { Random, hashCombine } from '../core/rng';
 import type { PopulateAccess } from '../world/generator';
 import { Biome, biomeDef } from './biomes';
 
-export type FeatureAccess = PopulateAccess & { scheduleFluid?: (x: number, y: number, z: number) => void };
+export type FeatureAccess = PopulateAccess & {
+  scheduleFluid?: (x: number, y: number, z: number) => void;
+  /** Columns where trees must not grow (village buildings). */
+  noTrees?: (x: number, z: number) => boolean;
+};
 
 const isAirOrPlant = (id: number) =>
   id === 0 || id === BlockId.TALL_GRASS || id === BlockId.DANDELION || id === BlockId.ROSE ||
@@ -350,6 +354,7 @@ export function decorateSurface(a: FeatureAccess, seed: number, cx: number, cz: 
     for (let i = 0; i < count; i++) {
       const x = ox + r.int(16);
       const z = oz + r.int(16);
+      if (a.noTrees?.(x, z)) continue;
       const y = surfaceY(a, x, z);
       const tb = biomeDef(a.biomeAt(x, z)).id;
       if (tb === Biome.TAIGA || tb === Biome.ICE_PLAINS || tb === Biome.ICE_MOUNTAINS) {

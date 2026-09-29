@@ -238,7 +238,7 @@ export class Renderer {
     let near = far * 0.55;
     if (dim === 1) { near = far * 0.1; far = Math.min(far, 96); }
     if (dim === 2) { near = far * 0.5; }
-    u.minLight.value = dim === 1 ? 0.12 : dim === 2 ? 0.25 : 0.02;
+    u.minLight.value = dim === 1 ? 0.1 : dim === 2 ? 0.2 : 0.0;
     if (cam.underwater) {
       fogColor = new THREE.Color(0.05, 0.08, 0.3).multiplyScalar(Math.max(0.3, skyState.daylight));
       near = 0; far = 24;

@@ -442,8 +442,11 @@ export class Game implements GameContext, InteractionHost, UIHost {
   private chunkReadyAround(x: number, z: number, radius: number): boolean {
     const cx = Math.floor(x) >> 4;
     const cz = Math.floor(z) >> 4;
+    // Circular, matching the chunk manager's streaming order.
+    const r2 = (radius + 0.5) * (radius + 0.5);
     for (let dx = -radius; dx <= radius; dx++) {
       for (let dz = -radius; dz <= radius; dz++) {
+        if (dx * dx + dz * dz > r2) continue;
         if (!this.chunkManager.isReady(cx + dx, cz + dz)) return false;
       }
     }
@@ -837,8 +840,15 @@ export class Game implements GameContext, InteractionHost, UIHost {
       const cx = Math.floor(p.x) >> 4;
       const cz = Math.floor(p.z) >> 4;
       let ready = 0;
-      for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) if (this.chunkManager.isReady(cx + dx, cz + dz)) ready++;
-      this.callbacks.onLoadingProgress(target?.title ?? 'Loading', ready / 25);
+      let total = 0;
+      for (let dx = -2; dx <= 2; dx++) {
+        for (let dz = -2; dz <= 2; dz++) {
+          if (dx * dx + dz * dz > 6.25) continue;
+          total++;
+          if (this.chunkManager.isReady(cx + dx, cz + dz)) ready++;
+        }
+      }
+      this.callbacks.onLoadingProgress(target?.title ?? 'Loading', ready / total);
       if (target && target.placeFn()) {
         this.loadingTarget = null;
         this.state = 'playing';
@@ -1124,8 +1134,11 @@ export class Game implements GameContext, InteractionHost, UIHost {
     const day = this.dim.id === Dim.OVERWORLD ? daylightFactor(this.world.dayTime, this.world.rainStrength) : 0;
     const sky = s - (1 - day) * 11;
     const l = Math.max(sky, b, 0);
-    const min = this.dim.id === Dim.NETHER ? 0.12 : this.dim.id === Dim.END ? 0.25 : 0.03;
-    return Math.max(min, Math.pow(0.8, 15 - l));
+    // Same curve as the terrain shader (materials.ts).
+    const amb = this.dim.id === Dim.NETHER ? 0.1 : this.dim.id === Dim.END ? 0.2 : 0;
+    const v = amb + (1 - amb) * Math.pow(0.8, 15 - l);
+    const g = this.settings.brightness;
+    return Math.max(0.03, v + ((1 - Math.pow(1 - v, 3)) - v) * g);
   }
 
   private renderScene(dt: number, alpha: number): void {

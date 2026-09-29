@@ -63,9 +63,10 @@ const FRAG_COMMON = /* glsl */ `
     float sky = vSky - (1.0 - daylight) * 11.0;
     float l = max(max(sky, vBlock), 0.0);
     float b = pow(0.8, 15.0 - l);
+    // Dimension ambient (the Nether and the End are never pitch black).
+    b = minLight + (1.0 - minLight) * b;
     // Brightness option lifts dark values like the old gamma slider.
-    b = mix(b, 1.0 - pow(1.0 - b, 3.0), brightness);
-    return max(b, minLight);
+    return mix(b, 1.0 - pow(1.0 - b, 3.0), brightness);
   }
   vec3 applyFog(vec3 col) {
     float f = smoothstep(fogNear, fogFar, vFogDepth);

@@ -225,6 +225,7 @@ export class OverworldGenerator implements DimensionGenerator {
 
   populate(access: PopulateAccess, cx: number, cz: number): void {
     const a = access as FeatureAccess;
+    a.noTrees = (x, z) => this.structures.inVillage(x, z);
     const seed = this.seed;
     const biome = biomeDef(a.biomeAt(cx * 16 + 16, cz * 16 + 16));
     // Lakes.
@@ -234,7 +235,7 @@ export class OverworldGenerator implements DimensionGenerator {
         const x = cx * 16 + r.int(16) + 8;
         const z = cz * 16 + r.int(16) + 8;
         const y = r.int(WORLD_HEIGHT);
-        if (y > SEA_LEVEL - 10 && y < a.topY(x, z) + 2) lake(a, r, x - 8, y - 4, z - 8, BlockId.WATER);
+        if (y > SEA_LEVEL - 10 && y < a.topY(x, z) + 2 && !this.structures.inVillage(x, z)) lake(a, r, x - 8, y - 4, z - 8, BlockId.WATER);
       }
       if (r.int(8) === 0) {
         const x = cx * 16 + r.int(16) + 8;
