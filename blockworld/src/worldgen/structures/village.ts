@@ -91,6 +91,30 @@ abstract class VillagePiece extends Piece {
     this.set(w, lx, ly, lz, BlockId.TORCH, this.attach(sdx, sdz));
   }
 
+  /**
+   * Pitched roof of oak stairs sloping along local z (ridge along x), starting
+   * at local y `base` over the footprint x0..x1 / z0..z1, with plank gables.
+   */
+  protected pitchedRoof(w: ChunkWriter, x0: number, x1: number, z0: number, z1: number, base: number): void {
+    const depth = z1 - z0 + 1;
+    const half = Math.floor(depth / 2);
+    for (let i = 0; i < half; i++) {
+      const y = base + i;
+      for (let x = x0 - 1; x <= x1 + 1; x++) {
+        this.put(w, x, y, z0 - 1 + i, BlockId.OAK_STAIRS, this.stairs(0, 1));
+        this.put(w, x, y, z1 + 1 - i, BlockId.OAK_STAIRS, this.stairs(0, -1));
+      }
+      for (let z = z0 + i; z <= z1 - i; z++) {
+        this.put(w, x0, y, z, BlockId.PLANKS);
+        this.put(w, x1, y, z, BlockId.PLANKS);
+        for (let x = x0 + 1; x < x1; x++) this.set(w, x, y, z, 0);
+      }
+    }
+    if (depth % 2 === 1) {
+      for (let x = x0 - 1; x <= x1 + 1; x++) this.put(w, x, base + half, z0 + half, BlockId.SLAB, 2);
+    }
+  }
+
   /** Plank walls with log corner posts between local y 1 and `top`. */
   protected timberWalls(w: ChunkWriter, x0: number, z0: number, x1: number, z1: number, top: number): void {
     for (let y = 1; y <= top; y++) {
@@ -206,8 +230,7 @@ class Butcher extends VillagePiece {
     this.box3(w, 0, 0, 0, 8, 0, 6, BlockId.COBBLESTONE);
     this.timberWalls(w, 0, 0, 8, 6, 3);
     for (let y = 1; y <= 3; y++) { this.put(w, 4, y, 6, BlockId.LOG); }
-    this.box3(w, 0, 4, 0, 8, 4, 6, BlockId.PLANKS);
-    this.box3(w, 1, 5, 1, 7, 5, 5, BlockId.PLANKS);
+    this.pitchedRoof(w, 0, 8, 0, 6, 4);
     for (const x of [2, 6]) { this.set(w, x, 2, 0, BlockId.GLASS_PANE); this.set(w, x, 2, 6, BlockId.GLASS_PANE); }
     this.set(w, 0, 2, 3, BlockId.GLASS_PANE);
     this.set(w, 8, 2, 3, BlockId.GLASS_PANE);
@@ -234,9 +257,7 @@ class Library extends VillagePiece {
     this.prepare(w);
     this.box3(w, 0, 0, 0, 8, 0, 5, BlockId.COBBLESTONE);
     this.timberWalls(w, 0, 0, 8, 5, 4);
-    this.box3(w, 0, 5, 0, 8, 5, 5, BlockId.PLANKS);
-    this.box3(w, 1, 6, 1, 7, 6, 4, BlockId.PLANKS);
-    this.box3(w, 2, 7, 2, 6, 7, 3, BlockId.PLANKS);
+    this.pitchedRoof(w, 0, 8, 0, 5, 5);
     for (let x = 1; x <= 7; x++) { this.set(w, x, 1, 4, BlockId.BOOKSHELF); this.set(w, x, 2, 4, BlockId.BOOKSHELF); }
     for (const x of [2, 6]) { this.set(w, x, 2, 0, BlockId.GLASS_PANE); this.set(w, x, 3, 0, BlockId.GLASS_PANE); }
     this.set(w, 0, 3, 2, BlockId.GLASS_PANE);

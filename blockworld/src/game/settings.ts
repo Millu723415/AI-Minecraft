@@ -2,17 +2,17 @@
 
 export type Action =
   | 'forward' | 'back' | 'left' | 'right' | 'jump' | 'sneak' | 'sprint'
-  | 'inventory' | 'drop' | 'chat' | 'debug' | 'perspective' | 'hideGui' | 'screenshot';
+  | 'inventory' | 'drop' | 'debug' | 'perspective' | 'hideGui' | 'screenshot';
 
 export const ACTION_LABELS: Record<Action, string> = {
   forward: 'Forward', back: 'Back', left: 'Left', right: 'Right', jump: 'Jump', sneak: 'Sneak',
-  sprint: 'Sprint', inventory: 'Inventory', drop: 'Drop Item', chat: 'Chat', debug: 'Debug Info',
+  sprint: 'Sprint', inventory: 'Inventory', drop: 'Drop Item', debug: 'Debug Info',
   perspective: 'Toggle Perspective', hideGui: 'Hide HUD', screenshot: 'Screenshot',
 };
 
 export const DEFAULT_KEYS: Record<Action, string> = {
   forward: 'KeyW', back: 'KeyS', left: 'KeyA', right: 'KeyD', jump: 'Space', sneak: 'ShiftLeft',
-  sprint: 'ControlLeft', inventory: 'KeyE', drop: 'KeyQ', chat: 'KeyT', debug: 'F3',
+  sprint: 'ControlLeft', inventory: 'KeyE', drop: 'KeyQ', debug: 'F3',
   perspective: 'F5', hideGui: 'F1', screenshot: 'F2',
 };
 

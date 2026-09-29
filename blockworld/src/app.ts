@@ -215,6 +215,7 @@ export class App implements AppHost, UIHost {
   openPause(): void {
     if (!this.game || this.game.state !== 'playing') return;
     this.game.paused = true;
+    void this.game.save();
     this.ui.open(new PauseScreen(this));
   }
 

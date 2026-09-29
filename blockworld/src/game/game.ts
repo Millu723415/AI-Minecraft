@@ -86,7 +86,8 @@ export class Game implements GameContext, InteractionHost, UIHost {
   private acc = 0;
   paused = false;
   private autosave = 0;
-  private saving = false;
+  private screenshotRequested = false;
+  private saveChain: Promise<void> = Promise.resolve();
   private pendingChunks = new Map<string, ChunkRecord>();
   private pendingEntities = new Map<string, EntityData[]>();
   /** Chunks known to have an entity record in storage. */
@@ -633,9 +634,14 @@ export class Game implements GameContext, InteractionHost, UIHost {
   }
 
   /** Persist everything that changed. Atomic via one IndexedDB transaction. */
-  async save(): Promise<void> {
-    if (this.saving) return;
-    this.saving = true;
+  /** Save the world. Overlapping calls queue up, so callers always wait for a write that includes their state. */
+  save(): Promise<void> {
+    const run = this.saveChain.then(() => this.saveNow());
+    this.saveChain = run.catch(() => undefined);
+    return run;
+  }
+
+  private async saveNow(): Promise<void> {
     try {
       for (const dim of this.world.dimensions.values()) {
         for (const c of dim.chunks.values()) {
@@ -663,8 +669,6 @@ export class Game implements GameContext, InteractionHost, UIHost {
     } catch (err) {
       console.error('Save failed', err);
       this.message('Saving failed! See console.');
-    } finally {
-      this.saving = false;
     }
   }
 
@@ -877,6 +881,10 @@ export class Game implements GameContext, InteractionHost, UIHost {
     this.chunkManager.flushNearbyDirty(p.x, p.z);
     this.audio.updateMusic(dt / 1000, this.dim.id);
     this.renderScene(dt, this.paused ? 1 : this.acc / TICK_MS);
+    if (this.screenshotRequested) {
+      this.screenshotRequested = false;
+      this.saveScreenshot();
+    }
   }
 
   private handleLook(): void {
@@ -923,7 +931,10 @@ export class Game implements GameContext, InteractionHost, UIHost {
 
     this.readInput();
     p.savePrev();
-    p.tick(this);
+    // Like the classic game, nothing simulates inside chunks that are not
+    // ready yet: the player waits instead of falling through missing terrain.
+    if (dim.isLoaded(Math.floor(p.x), Math.floor(p.z))) p.tick(this);
+    else { p.motionX = 0; p.motionY = 0; p.motionZ = 0; }
     this.tickSleep();
     this.interaction.tick();
     this.entities.tick(this, dim);
@@ -1143,6 +1154,22 @@ export class Game implements GameContext, InteractionHost, UIHost {
     return Math.max(0.03, v + ((1 - Math.pow(1 - v, 3)) - v) * g);
   }
 
+  /** Save the frame just rendered as a PNG download (F2). */
+  private saveScreenshot(): void {
+    const canvas = this.renderer.canvas;
+    canvas.toBlob((blob) => {
+      if (!blob) return;
+      const a = document.createElement('a');
+      const d = new Date();
+      const pad = (n: number) => String(n).padStart(2, '0');
+      a.download = `blockworld-${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}_${pad(d.getHours())}.${pad(d.getMinutes())}.${pad(d.getSeconds())}.png`;
+      a.href = URL.createObjectURL(blob);
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+      this.ui.hud.message(`Saved screenshot as ${a.download}`);
+    }, 'image/png');
+  }
+
   private renderScene(dt: number, alpha: number): void {
     const p = this.player;
     const x = p.prevX + (p.x - p.prevX) * alpha;
@@ -1252,6 +1279,7 @@ export class Game implements GameContext, InteractionHost, UIHost {
     if (this.state !== 'playing') return false;
     if (code === k.debug) { this.showDebug = !this.showDebug; return true; }
     if (code === k.hideGui) { this.hideGui = !this.hideGui; return true; }
+    if (code === k.screenshot) { this.screenshotRequested = true; return true; }
     if (code === k.perspective) { this.thirdPerson = !this.thirdPerson; return true; }
     if (this.ui.screen) {
       if (code === k.inventory && this.ui.screen.closable && !(this.ui.screen instanceof SignScreen)) { this.ui.close(); return true; }

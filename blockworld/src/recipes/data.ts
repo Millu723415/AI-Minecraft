@@ -107,7 +107,6 @@ shaped(['###', '###', '###'], { '#': I(ItemId.GOLD_NUGGET) }, ItemId.GOLD_INGOT)
 const stairs: [Ingredient, number][] = [
   [PLANKS, BlockId.OAK_STAIRS], [COBBLE, BlockId.COBBLESTONE_STAIRS], [I(BlockId.BRICKS), BlockId.BRICK_STAIRS],
   [I(BlockId.STONE_BRICKS), BlockId.STONE_BRICK_STAIRS], [I(BlockId.NETHER_BRICK), BlockId.NETHER_BRICK_STAIRS],
-  [I(BlockId.SANDSTONE), BlockId.SANDSTONE_STAIRS],
 ];
 for (const [mat, out] of stairs) shaped(['#  ', '## ', '###'], { '#': mat }, out, 4);
 const slabs: [Ingredient, number][] = [
