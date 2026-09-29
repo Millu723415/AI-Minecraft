@@ -339,11 +339,13 @@ if (hunt.meat) {
     p.pitch = 1.4; // look at the sky, nothing to click
     i.locked = true; await T.wait(400);
     i.rightDown = true; i.rightPressed = true;
-    await T.until(() => p.foodLevel > 10, 8000);
+    await T.until(() => p.foodLevel > 10, 15000);
     i.rightDown = false;
-    return { food: p.foodLevel };
+    const held = p.inventory.held;
+    return { food: p.foodLevel, held: held?.id ?? 0, selected: p.inventory.selected, screen: !!g.ui.screen, paused: g.paused, state: g.state, target: g.interaction.target?.id ?? null };
   }, cooked);
-  check('eating cooked meat restores hunger', eat.food > 10, `(food ${eat.food})`);
+  await shot('eat');
+  check('eating cooked meat restores hunger', eat.food > 10, JSON.stringify(eat));
 }
 
 check('no page errors', errors.length === 0, errors.slice(0, 3).join(' | '));

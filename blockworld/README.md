@@ -228,6 +228,12 @@ loaded/meshed chunks, entity count and average generation/mesh/light timings.
 Lower **Render Distance** or switch to **Fast** graphics in Options on slower
 machines.
 
+`npx vite-node scripts/bench.ts [seed] [radius]` measures the CPU side of the
+chunk pipeline. On the development machine (one core, seed 12345, 225
+chunks): terrain generation 6.1 ms/chunk (in web workers during play),
+population 2.8 ms, lighting 4.5 ms and meshing 7.6 ms per chunk, about 6,500
+triangles per chunk.
+
 ## ERA SCOPE
 
 The content deliberately stops at the late-2011 feature set: no modern
