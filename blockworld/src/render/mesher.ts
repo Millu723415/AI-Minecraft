@@ -204,6 +204,13 @@ function faceUV(face: number, x: number, y: number, z: number): [number, number]
   }
 }
 
+// Texture (u, v) of each face corner, from faceUV.
+const CORNER_UV: Float32Array[] = FACE_CORNERS.map((corners, f) => {
+  const a = new Float32Array(8);
+  corners.forEach((p, c) => { const [u, v] = faceUV(f, p[0], p[1], p[2]); a[c * 2] = u; a[c * 2 + 1] = v; });
+  return a;
+});
+
 // Precomputed padded-index offsets for smooth lighting: [face][corner] -> [side1, side2, corner].
 const AO_OFFSETS: Int32Array[] = [];
 {
@@ -295,6 +302,9 @@ export class ChunkMesher {
           const i = pidx(x, y, z);
           const id = pBlocks[i];
           if (id === 0) continue;
+          // Buried full cubes have no visible faces.
+          if (SOLID[id] && SOLID[pBlocks[i + SX]] && SOLID[pBlocks[i - SX]] && SOLID[pBlocks[i + SY]] &&
+            SOLID[pBlocks[i - SY]] && SOLID[pBlocks[i + SZ]] && SOLID[pBlocks[i - SZ]]) continue;
           this.emitBlock(id, pMeta[i], x, y, z, i);
         }
       }
@@ -417,6 +427,7 @@ export class ChunkMesher {
   private emitCubeFace(buf: MeshBuffer, f: number, x: number, y: number, z: number, ni: number, tile: number, r: number, g: number, b: number): void {
     const [u0, v0, u1, v1] = tileUV(tile);
     const corners = FACE_CORNERS[f];
+    const cuv = CORNER_UV[f];
     const offs = AO_OFFSETS[f];
     const smooth = this.options.smoothLighting;
     const faceShade = FACE_SHADE[f];
@@ -443,10 +454,9 @@ export class ChunkMesher {
         blk /= n;
       }
       if (c === 0) ao0 = ao; else if (c === 1) ao1 = ao; else if (c === 2) ao2 = ao; else ao3 = ao;
-      const [tu, tv] = faceUV(f, p[0], p[1], p[2]);
       buf.vertex(
         x + p[0], y + p[1], z + p[2],
-        u0 + (u1 - u0) * tu, v0 + (v1 - v0) * tv,
+        u0 + (u1 - u0) * cuv[c * 2], v0 + (v1 - v0) * cuv[c * 2 + 1],
         Math.round(sky * 17), Math.round(blk * 17), Math.round(faceShade * AO_CURVE[ao] * 255),
         r, g, b,
       );

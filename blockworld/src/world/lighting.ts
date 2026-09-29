@@ -111,13 +111,24 @@ export class LightEngine {
     // 2. Seeds: sky cells that can spread sideways, and block light emitters.
     const q = this.addQueue;
     q.reset();
+    // Sky cells above every neighbour's height map are already 15 all around
+    // and cannot spread; only cells at or below it are seeds. Across a chunk
+    // border the neighbour's height map counts only once that chunk is lit
+    // (an unlit neighbour pulls light in when it is lit itself).
+    const west = this.source.getChunk(chunk.cx - 1, chunk.cz);
+    const east = this.source.getChunk(chunk.cx + 1, chunk.cz);
+    const north = this.source.getChunk(chunk.cx, chunk.cz - 1);
+    const south = this.source.getChunk(chunk.cx, chunk.cz + 1);
     const neighborHeights = (x: number, z: number): number => {
       let m = chunk.heightMap[x | (z << 4)];
       if (x > 0) m = Math.max(m, chunk.heightMap[(x - 1) | (z << 4)]);
+      else if (west?.lit) m = Math.max(m, west.heightMap[15 | (z << 4)]);
       if (x < 15) m = Math.max(m, chunk.heightMap[(x + 1) | (z << 4)]);
+      else if (east?.lit) m = Math.max(m, east.heightMap[z << 4]);
       if (z > 0) m = Math.max(m, chunk.heightMap[x | ((z - 1) << 4)]);
+      else if (north?.lit) m = Math.max(m, north.heightMap[x | (15 << 4)]);
       if (z < 15) m = Math.max(m, chunk.heightMap[x | ((z + 1) << 4)]);
-      if (x === 0 || x === 15 || z === 0 || z === 15) m = WORLD_HEIGHT - 1;
+      else if (south?.lit) m = Math.max(m, south.heightMap[x]);
       return m;
     };
     for (let z = 0; z < 16; z++) {
@@ -147,9 +158,14 @@ export class LightEngine {
       for (let k = 0; k < 16; k++) {
         const lx = sx + stx * k;
         const lz = sz + stz * k;
+        // The adjoining column of this chunk: above its height map it is
+        // already full skylight, so neighbour sky there adds nothing.
+        const ax = dcx === 0 ? lx : dcx < 0 ? 0 : 15;
+        const az = dcz === 0 ? lz : dcz < 0 ? 0 : 15;
+        const skyTop = hasSky ? chunk.heightMap[ax | (az << 4)] : WORLD_HEIGHT;
         for (let y = 0; y < WORLD_HEIGHT; y++) {
           const v = n.light[blockIndex(lx, y, lz)];
-          if ((v >> 4) > 1) q.push(nbx + lx, y, nbz + lz, 0);
+          if ((v >> 4) > 1 && y < skyTop) q.push(nbx + lx, y, nbz + lz, 0);
           if ((v & 15) > 1) q.push(nbx + lx, y, nbz + lz, 1);
         }
       }

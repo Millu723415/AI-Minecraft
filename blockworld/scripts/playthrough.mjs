@@ -174,6 +174,8 @@ const fight = await ev(async () => {
     for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) d.setBlock(bx + dx, by, bz + dz, 49, 0);
     for (let tries = 0; tries < 4 && !c.removed; tries++) {
       p.setPosition(bx + 0.5, by + 1, bz + 0.5); p.motionX = p.motionY = p.motionZ = 0; p.fallDistance = 0;
+      // Entities (and arrows) only move in loaded chunks: wait for both ends.
+      await T.until(() => d.isLoaded(Math.floor(p.x), Math.floor(p.z)) && d.isLoaded(Math.floor(c.x), Math.floor(c.z)), 60000);
       await T.wait(300);
       T.aimAt(c.x, c.y + 1.2, c.z);
       await T.shoot();

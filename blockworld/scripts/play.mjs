@@ -24,6 +24,7 @@ for (const step of steps) {
     const r = await page.evaluate(step.eval);
     if (r !== undefined) console.log('eval:', typeof r === 'string' ? r : JSON.stringify(r));
   }
+  if (step.key) await page.keyboard.press(step.key);
   if (step.wait) await page.waitForTimeout(step.wait);
   if (step.shot) await page.screenshot({ path: `${prefix}-${shot++}.png` });
 }

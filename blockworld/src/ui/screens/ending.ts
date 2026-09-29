@@ -66,6 +66,8 @@ export class EndingScreen extends Screen {
   private offset = 0;
   private height = 0;
   private done = false;
+  /** Scrolling follows the clock, so slow frames do not stretch the ending. */
+  private start = 0;
 
   constructor(private readonly onFinish: () => void) {
     super('ending');
@@ -77,7 +79,7 @@ export class EndingScreen extends Screen {
     clearChildren(r);
     r.style.background = 'repeating-linear-gradient(45deg, #0b0b10 0 4px, #0e0e14 4px 8px)';
     this.scroll = el('div', 'ending-scroll', r);
-    for (let i = 0; i < 6; i++) el('p', '', this.scroll, ' ');
+    el('p', '', this.scroll, ' ');
     for (const [who, line] of POEM) el('p', who, this.scroll, line);
     for (let i = 0; i < 4; i++) el('p', '', this.scroll, ' ');
     for (const [cls, line] of CREDITS) el('p', cls, this.scroll, line || ' ');
@@ -86,12 +88,13 @@ export class EndingScreen extends Screen {
     button(skip, 'Skip', () => this.finish(), 60);
     this.offset = this.ui.height;
     this.height = 0;
+    this.start = performance.now();
   }
 
-  override update(dt: number): void {
+  override update(_dt: number): void {
     if (this.done) return;
     if (!this.height) this.height = this.scroll.scrollHeight || this.scroll.offsetHeight;
-    this.offset -= (dt / 1000) * 14;
+    this.offset = this.ui.height - ((performance.now() - this.start) / 1000) * 14;
     this.scroll.style.top = `${Math.round(this.offset)}px`;
     if (this.height > 0 && this.offset < -this.height - 20) this.finish();
   }

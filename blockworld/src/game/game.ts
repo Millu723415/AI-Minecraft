@@ -838,6 +838,8 @@ export class Game implements GameContext, InteractionHost, UIHost {
       this.fpsFrames = 0;
       this.fpsTime = 0;
     }
+    // The ending covers the screen and pauses the world, like a pause menu.
+    if (this.state === 'ending') return;
     const rd = this.settings.renderDistance;
     this.renderer.setRenderDistance(rd);
     const p = this.player;
@@ -1294,7 +1296,8 @@ export class Game implements GameContext, InteractionHost, UIHost {
   onKey(code: string): boolean {
     const k = this.settings.keys;
     const p = this.player;
-    if (this.state !== 'playing') return false;
+    // Death and ending screens take their own keys.
+    if (this.state !== 'playing') return this.ui.screen ? this.ui.onKey(code) : false;
     if (code === k.debug) { this.showDebug = !this.showDebug; return true; }
     if (code === k.hideGui) { this.hideGui = !this.hideGui; return true; }
     if (code === k.screenshot) { this.screenshotRequested = true; return true; }
