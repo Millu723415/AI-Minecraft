@@ -52,6 +52,8 @@ export function createTestWorld(radius = 2): TestWorld {
     travelTo: () => {},
     message: () => {},
     tick: () => {},
+    world: { dragonKilled: false, endInitialized: true, dayTime: 6000, rainStrength: 0 },
+    player: { inventory: { held: null }, type: 'player' },
   } as unknown as TestWorld['ctx'];
   const behaviors = new BlockBehaviors(ctx);
   const redstone = new Redstone(ctx);
