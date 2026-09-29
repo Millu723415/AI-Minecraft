@@ -87,7 +87,7 @@ function targetsOf(itemId: number): Target[] {
   }
   if (def.toolCategory === 'sword') return ['weapon'];
   if (def.toolCategory === 'pickaxe' || def.toolCategory === 'axe' || def.toolCategory === 'shovel') return ['tool'];
-  if (def.name === 'bow') return ['bow'];
+  // Bows could not be enchanted on the table in this era.
   return [];
 }
 
@@ -98,17 +98,40 @@ export function isEnchantable(stack: ItemStack | null): boolean {
 }
 
 /**
- * Level requirements of the three table slots given bookshelf count (0..15).
- * Uses the release-era distribution: the bottom slot can reach level 50.
+ * Level requirements of the three table slots for a bookshelf count. The
+ * release-era table counts shelves on two layers (up to 30 matter) and its
+ * bottom slot reaches level 50.
  */
 export function enchantCosts(seed: number, bookshelves: number): [number, number, number] {
   const r = new Random(seed);
-  const shelves = Math.min(15, bookshelves);
-  const base = r.range(1, 8) + (shelves >> 1) + r.int(shelves + 1);
-  const a = Math.max(Math.floor(base / 3), 1);
-  const b = Math.floor((base * 2) / 3 + 1);
-  const c = Math.max(base, shelves * 2);
-  return [a, b, c];
+  const shelves = Math.min(30, bookshelves);
+  const slot = (i: number): number => {
+    const b = 1 + (shelves >> 1) + r.int(shelves + 1);
+    const v = r.int(5) + b;
+    return i === 0 ? (v >> 1) + 1 : i === 1 ? Math.floor((v * 2) / 3) + 1 : v;
+  };
+  return [slot(0), slot(1), slot(2)];
+}
+
+/**
+ * Bookshelves boosting an enchanting table at (x, y, z): shelves two blocks
+ * away on the table's level and the one above, with air in between.
+ */
+export function countBookshelves(getBlock: (x: number, y: number, z: number) => number, x: number, y: number, z: number, shelfId: number): number {
+  let n = 0;
+  for (let dz = -1; dz <= 1; dz++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      if ((dx === 0 && dz === 0) || getBlock(x + dx, y, z + dz) !== 0 || getBlock(x + dx, y + 1, z + dz) !== 0) continue;
+      for (let dy = 0; dy <= 1; dy++) {
+        if (getBlock(x + dx * 2, y + dy, z + dz * 2) === shelfId) n++;
+        if (dx !== 0 && dz !== 0) {
+          if (getBlock(x + dx * 2, y + dy, z + dz) === shelfId) n++;
+          if (getBlock(x + dx, y + dy, z + dz * 2) === shelfId) n++;
+        }
+      }
+    }
+  }
+  return n;
 }
 
 /** Choose enchantments for an item at a given level cost. */

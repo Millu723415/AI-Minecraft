@@ -56,6 +56,34 @@ await ev(() => {
     },
     /** Put the player on the ground at (x, z) next to a block. */
     standAt(x, y, z) { const p = app.game.player; p.setPosition(x, y, z); p.motionX = p.motionY = p.motionZ = 0; p.fallDistance = 0; },
+    /** Stand on free ground next to a block (any side with room for the player). */
+    standNear(t) {
+      const d = app.game.dim;
+      for (const [ox, oz] of [[-2, 0], [2, 0], [0, -2], [0, 2], [-1, 0], [1, 0], [0, -1], [0, 1]]) {
+        const x = t.x + ox; const z = t.z + oz;
+        for (let y = t.y + 1; y >= t.y - 1; y--) {
+          const ground = d.getBlock(x, y - 1, z);
+          if (ground !== 0 && ground !== 58 && ground !== 61 && d.getBlock(x, y, z) === 0 && d.getBlock(x, y + 1, z) === 0) { T.standAt(x + 0.5, y, z + 0.5); return; }
+        }
+      }
+      T.standAt(t.x - 1.5, t.y, t.z + 0.5);
+    },
+    /** Place the held block on free ground about two blocks from the player. */
+    async placeNear() {
+      const g = app.game; const p = g.player; const d = g.dim;
+      const px = Math.floor(p.x); const pz = Math.floor(p.z); const py = Math.floor(p.y);
+      for (const [ox, oz] of [[2, 0], [-2, 0], [0, 2], [0, -2], [2, 1], [-2, 1], [1, 2], [1, -2]]) {
+        const x = px + ox; const z = pz + oz;
+        for (let y = py + 1; y >= py - 2; y--) {
+          if ([2, 3, 1, 4, 12, 13].includes(d.getBlock(x, y, z)) && d.getBlock(x, y + 1, z) === 0 && d.getBlock(x, y + 2, z) === 0) {
+            T.aimAt(x + 0.5, y + 0.999, z + 0.5);
+            await T.use();
+            return { x, y: y + 1, z, id: d.getBlock(x, y + 1, z) };
+          }
+        }
+      }
+      return { id: -1, why: 'no free ground' };
+    },
     screen() { return app.game.ui.screen; },
     /** What kind of container screen is open (class names are minified in production builds). */
     kind() {
@@ -98,6 +126,18 @@ async function click(i, button = 'left', shift = false) {
   await page.waitForTimeout(150);
 }
 const slotOf = (group, n = 0) => ev(([g, k]) => T.slot(g, k), [group, n]);
+const held = () => ev(() => app.game.ui.cursor?.id ?? 0);
+/** Right-click one item of `id` into each listed slot, picking up more when the held stack runs out. */
+async function placeEach(id, slots) {
+  for (const k of slots) {
+    if ((await held()) !== id) {
+      if ((await held()) !== 0) await click(await empty('main'));
+      await click(await slotWith(id));
+    }
+    await click(k, 'right');
+  }
+  if ((await held()) !== 0) await click(await empty('main')); // put the rest back
+}
 const slotWith = (id) => ev((k) => T.slotWith(k), id);
 const empty = (group = 'main') => ev((g) => T.emptySlot(g), group);
 const count = (id) => ev((k) => T.count(k), id);
@@ -115,7 +155,8 @@ const findTree = (skip) => ev((skipList) => {
       if (Math.max(Math.abs(dx), Math.abs(dz)) !== r) continue;
       const x = px + dx; const z = pz + dz;
       if (skipList.some((t) => Math.abs(t.x - x) + Math.abs(t.z - z) < 3)) continue;
-      for (let y = 100; y > 50; y--) {
+      // Lowest log of a trunk standing on grass or dirt.
+      for (let y = 50; y < 100; y++) {
         if (d.getBlock(x, y, z) !== 17 || d.getBlock(x, y + 1, z) !== 17) continue;
         const below = d.getBlock(x, y - 1, z);
         if (below !== 2 && below !== 3) break;
@@ -148,24 +189,24 @@ await shot('logs');
 // ---- 2. Inventory crafting ---------------------------------------------------
 await page.keyboard.press('KeyE');
 check('E opens the inventory', await ev(() => T.until(() => T.kind() === 'inventory', 5000)));
-await click(await slotWith(ID.LOG));                 // pick up logs
-await click(await slotOf('craft', 0));               // put them in the grid
-await click(await slotOf('craftOut'), 'left', true); // shift-click: craft all
+// Different trees give different log stacks: craft each stack in turn.
+let logStacks = 0;
+while ((await slotWith(ID.LOG)) >= 0 && logStacks < 4) {
+  await click(await slotWith(ID.LOG));                 // pick up a stack of logs
+  await click(await slotOf('craft', 0));               // put it in the grid
+  await click(await slotOf('craftOut'), 'left', true); // shift-click: craft all
+  logStacks++;
+}
 const planks = await count(ID.PLANKS);
-check('logs become planks (shift-click crafts all)', planks >= 12, `(${planks} planks)`);
+check('logs become planks (shift-click crafts all)', planks === logs * 4, `(${planks} planks from ${logs} logs in ${logStacks} stacks)`);
 await shot('planks');
 // Crafting table: one plank in each 2x2 cell.
-await click(await slotWith(ID.PLANKS));
-for (let k = 0; k < 4; k++) await click(await slotOf('craft', k), 'right');
-await click(await empty('main')); // put the rest back
+await placeEach(ID.PLANKS, [await slotOf('craft', 0), await slotOf('craft', 1), await slotOf('craft', 2), await slotOf('craft', 3)]);
 await click(await slotOf('craftOut'));
 await click(await slotOf('hotbar', 1));
 check('a crafting table is crafted', (await count(ID.TABLE)) === 1);
 // Sticks: two planks stacked vertically.
-await click(await slotWith(ID.PLANKS));
-await click(await slotOf('craft', 0), 'right');
-await click(await slotOf('craft', 2), 'right');
-await click(await empty('main'));
+await placeEach(ID.PLANKS, [await slotOf('craft', 0), await slotOf('craft', 2)]);
 await click(await slotOf('craftOut'));
 await click(await empty('main'));
 check('sticks are crafted', (await count(ID.STICK)) >= 4);
@@ -176,11 +217,8 @@ await ev(() => T.until(() => !T.screen(), 5000));
 const table = await ev(async () => {
   const g = app.game; const p = g.player; const d = g.dim;
   p.inventory.selected = 1;
-  const x = Math.floor(p.x) + 2; const z = Math.floor(p.z);
-  let y = Math.floor(p.y) + 3; while (y > 1 && d.getBlock(x, y, z) === 0) y--;
-  T.aimAt(x + 0.5, y + 1, z + 0.5);
-  await T.use();
-  return { x, y: y + 1, z, id: d.getBlock(x, y + 1, z) };
+  void d;
+  return T.placeNear();
 });
 check('the crafting table can be placed', table.id === ID.TABLE, JSON.stringify(table));
 await ev(async (t) => { T.aimAt(t.x + 0.5, t.y + 0.5, t.z + 0.5); await T.use(); }, table);
@@ -188,9 +226,9 @@ check('right-clicking the table opens the 3x3 grid', await ev(() => T.until(() =
 async function craft3(pattern, key, dest = 'hotbar', destN = 2) {
   // pattern: 9 chars, key maps char -> item id; one item per cell via right-click.
   for (const [ch, id] of Object.entries(key)) {
-    await click(await slotWith(id));
-    for (let k = 0; k < 9; k++) if (pattern[k] === ch) await click(await slotOf('craft', k), 'right');
-    await click(await empty('main'));
+    const cells = [];
+    for (let k = 0; k < 9; k++) if (pattern[k] === ch) cells.push(await slotOf('craft', k));
+    await placeEach(id, cells);
   }
   await click(await slotOf('craftOut'));
   await click(await slotOf(dest, destN));
@@ -208,6 +246,8 @@ const dig = await ev(async () => {
   let cobble = 0;
   for (let n = 0; n < 40 && p.inventory.count(4) < 11; n++) {
     const x = Math.floor(p.x); const z = Math.floor(p.z); const y = Math.floor(p.y + 0.01) - 1;
+    // Stand in the middle of the column so digging under it drops us down.
+    T.standAt(x + 0.5, p.y, z + 0.5);
     const id = d.getBlock(x, y, z);
     if (id === 7 || id === 8 || id === 9 || id === 10 || id === 11) break;
     // Mine the block under our feet, then the one beside it for more stone.
@@ -225,7 +265,7 @@ check('mining wears the pickaxe', dig.pickDamage > 0, `(damage ${dig.pickDamage}
 await shot('stone');
 
 // ---- 5. Stone tools and a furnace ----------------------------------------------
-await ev((t) => { T.standAt(t.x - 1.5, t.y, t.z + 0.5); }, table);
+await ev((t) => T.standNear(t), table);
 await ev(() => T.wait(1500));
 await ev(async (t) => { T.aimAt(t.x + 0.5, t.y + 0.5, t.z + 0.5); await T.use(); }, table);
 check('back at the table', await ev(() => T.until(() => T.kind() === 'table', 5000)));
@@ -239,7 +279,8 @@ await ev(() => T.until(() => !T.screen(), 5000));
 // ---- 6. Food ---------------------------------------------------------------------
 const hunt = await ev(async () => {
   const g = app.game; const p = g.player; const d = g.dim;
-  const animals = g.entitiesIn(d).filter((e) => ['pig', 'cow', 'chicken', 'sheep'].includes(e.type) && !e.removed);
+  // Sheep give only wool in this era.
+  const animals = g.entitiesIn(d).filter((e) => ['pig', 'cow', 'chicken'].includes(e.type) && !e.removed);
   animals.sort((a, b) => a.distanceSqTo(p.x, p.y, p.z) - b.distanceSqTo(p.x, p.y, p.z));
   const a = animals[0];
   if (!a) return { found: false };
@@ -264,19 +305,19 @@ const hunt = await ev(async () => {
 check('an animal is hunted for raw meat', hunt.found && hunt.meat > 0, JSON.stringify(hunt));
 
 // ---- 7. Furnace: cook the meat with planks as fuel, then eat ----------------------
+await ev((t) => T.standNear(t), table);
+await ev(() => T.wait(1500));
 const furnace = await ev(async () => {
   const g = app.game; const p = g.player; const d = g.dim;
   p.inventory.selected = 4;
-  const x = Math.floor(p.x) + 2; const z = Math.floor(p.z);
-  let y = Math.floor(p.y) + 3; while (y > 1 && d.getBlock(x, y, z) === 0) y--;
-  T.aimAt(x + 0.5, y + 1, z + 0.5);
-  await T.use();
-  const pos = { x, y: y + 1, z, id: d.getBlock(x, y + 1, z) };
-  T.aimAt(x + 0.5, y + 1.5, z + 0.5);
+  void d;
+  const pos = await T.placeNear();
+  if (pos.id !== 61) return pos;
+  T.aimAt(pos.x + 0.5, pos.y + 0.5, pos.z + 0.5);
   await T.use();
   return pos;
 });
-check('the furnace is placed and opens', furnace.id === ID.FURNACE && await ev(() => T.until(() => T.kind() === 'furnace', 5000)));
+check('the furnace is placed and opens', furnace.id === ID.FURNACE && await ev(() => T.until(() => T.kind() === 'furnace', 5000)), JSON.stringify(furnace));
 if (hunt.meat) {
   await click(await slotWith(hunt.meat));
   await click(await slotOf('input'));
@@ -295,7 +336,7 @@ if (hunt.meat) {
     const idx = p.inventory.slots.findIndex((s) => s?.id === c);
     if (idx > 8) { const tmp = p.inventory.get(5); p.inventory.set(5, p.inventory.get(idx)); p.inventory.set(idx, tmp); p.inventory.selected = 5; } else p.inventory.selected = idx;
     p.foodLevel = 10; // as if after a long day of work
-    p.pitch = -1.4; // look at the sky, nothing to click
+    p.pitch = 1.4; // look at the sky, nothing to click
     i.locked = true; await T.wait(400);
     i.rightDown = true; i.rightPressed = true;
     await T.until(() => p.foodLevel > 10, 8000);

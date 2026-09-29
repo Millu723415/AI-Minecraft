@@ -176,7 +176,8 @@ rods, ender pearls), Eyes of Ender, player and tile serialisation, Nether
 portal detection, End portal activation, the furnace, the dragon's death
 creating the exit portal and egg, redstone circuits, structure generation
 (strongholds with exactly one portal room, villages, mineshafts, fortresses,
-the End pillars) and mob model textures.
+the End pillars), mob model textures, boats and minecarts (floating,
+steering, rails, powered rails, slopes) and creative flight.
 
 Browser checks (require the dev server, or set `GAME_URL`, and Playwright's
 Chromium):

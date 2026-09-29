@@ -6,7 +6,7 @@ import { Container } from '../../items/container';
 import { allItems, getItem } from '../../items/registry';
 import { canMerge, cloneStack, createStack, isEmpty, maxStackSize, type ItemStack } from '../../items/stack';
 import { consumeIngredients, craftingResult, findSmelting, fuelTicks } from '../../recipes/crafting';
-import { enchantCosts, isEnchantable, selectEnchantments } from '../../items/enchantments';
+import { countBookshelves, enchantCosts, isEnchantable, selectEnchantments } from '../../items/enchantments';
 import { isBrewingIngredient } from '../../game/brewing';
 import type { Dimension } from '../../world/dimension';
 import type { BrewingTile, ChestTile, FurnaceTile } from '../../world/tileentity';
@@ -407,21 +407,8 @@ export class EnchantScreen extends ContainerScreen {
   }
 
   private bookshelves(): number {
-    let n = 0;
     const d = this.dim;
-    for (let dz = -1; dz <= 1; dz++) {
-      for (let dx = -1; dx <= 1; dx++) {
-        if ((dx === 0 && dz === 0) || d.getBlock(this.x + dx, this.y, this.z + dz) !== 0 || d.getBlock(this.x + dx, this.y + 1, this.z + dz) !== 0) continue;
-        for (let dy = 0; dy <= 1; dy++) {
-          if (d.getBlock(this.x + dx * 2, this.y + dy, this.z + dz * 2) === BlockId.BOOKSHELF) n++;
-          if (dx !== 0 && dz !== 0) {
-            if (d.getBlock(this.x + dx * 2, this.y + dy, this.z + dz) === BlockId.BOOKSHELF) n++;
-            if (d.getBlock(this.x + dx, this.y + dy, this.z + dz * 2) === BlockId.BOOKSHELF) n++;
-          }
-        }
-      }
-    }
-    return n;
+    return countBookshelves((x, y, z) => d.getBlock(x, y, z), this.x, this.y, this.z, BlockId.BOOKSHELF);
   }
 
   private choose(i: number): void {
